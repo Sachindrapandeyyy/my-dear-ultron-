@@ -1,0 +1,50 @@
+{
+  "name": "my-dear-ultron",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Next-Gen Autonomous AI Desktop Assistant with Holographic 3D Orb, Collective Memory, and OS Automation",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "app": "vite",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "ai",
+    "assistant",
+    "desktop",
+    "jarvis",
+    "ultron",
+    "threejs",
+    "mediapipe",
+    "memory",
+    "modelscope",
+    "collective-intelligence"
+  ],
+  "author": "Sachindra Pandey",
+  "license": "MIT",
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.21",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.16.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.0.2",
+    "three": "^0.174.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@types/three": "^0.174.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0"
+  }
+}
