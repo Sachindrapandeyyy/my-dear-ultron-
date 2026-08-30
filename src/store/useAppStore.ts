@@ -138,13 +138,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
 
   settings: {
-    llmProvider: 'gemini',
+    llmProvider: 'ollama',
     apiKey: '',
-    modelName: 'gemini-2.0-flash',
+    modelName: 'llama3.2',
     ollamaEndpoint: 'http://localhost:11434',
     voiceEnabled: true,
-    voiceSpeed: 1.0,
-    voicePitch: 0.95,
+    voiceSpeed: 1.05,
+    voicePitch: 0.88,
     selectedVoice: '',
     theme: 'ultron',
     globalHotkey: 'Ctrl+Space',
