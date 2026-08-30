@@ -164,7 +164,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   settings: {
     llmProvider: 'ollama',
     apiKey: '',
-    modelName: 'nemotron-mini:latest',
+    modelName: 'llama3.2:latest',
     ollamaEndpoint: 'http://localhost:11434',
     voiceEnabled: true,
     voiceSpeed: 1.05,

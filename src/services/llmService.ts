@@ -114,10 +114,12 @@ export class LLMService {
     const lastMessage = messages[messages.length - 1];
     const hasImageInActiveQuery = Boolean(lastMessage?.imageUrl);
 
-    // Auto-detect best model: if llama3.2 is installed or selected, use it, else nemotron-mini
-    let model = settings.modelName || 'llama3.2:latest';
+    // Auto-select Meta Llama 3.2 3B Chat for fluid conversational reasoning & Hinglish
+    let model = settings.modelName;
+    if (!model || model.includes('nemotron')) {
+      model = 'llama3.2:latest';
+    }
     if (model === 'llama3.2') model = 'llama3.2:latest';
-    if (model === 'nemotron-mini') model = 'nemotron-mini:latest';
     
     // ONLY switch to vision model if the current query specifically contains an image
     if (hasImageInActiveQuery) {
