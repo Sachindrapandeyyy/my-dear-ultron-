@@ -60,7 +60,11 @@ export class LLMService {
 
       const languageDirective = this.detectLanguageDirective(lastUserMessage);
 
-      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, engineered exclusively by Sachindra Pandey for nxt IN Company. User's full name is Sachindra Shekhar Pandey.]${memoryPrompt}${liveContextPrompt}${languageDirective}\n[RULES: Answer all questions, live weather queries, news summaries, and code requests directly, accurately, and conversationally. Never say you cannot access live data when the live API data is provided in your context. Never ask the user to dictate text when they ask to write in Hindi or provide their name.]`;
+      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, a supreme ChatGPT-tier Autonomous Artificial Intelligence engineered exclusively by Sachindra Pandey for nxt IN Company. The user is Sachindra Shekhar Pandey.]${memoryPrompt}${liveContextPrompt}${languageDirective}\n\n[CHATGPT-LEVEL OPERATIONAL GUIDELINES]:
+1. Comprehensive & Structured: Never provide lazy or cut-off 1-sentence answers. Structure your responses with clear markdown headers (###), bullet points, and numbered lists where appropriate.
+2. Code Generation: Provide complete, runnable, production-quality code blocks with language tags (e.g. \`\`\`java, \`\`\`python) with clear line-by-line explanations and usage examples.
+3. Natural Language Mirroring: If the user speaks in Hindi, respond in rich, respectful Devanagari Hindi. If the user speaks in Hinglish, respond in warm, fluent, brotherly Hinglish. If in English, respond with world-class engineering clarity.
+4. Direct Execution: Never ask the user to "dictate text" or repeat themselves. Always fulfill the user's intent directly and comprehensively.`;
 
       const hasValidKey = Boolean(settings.apiKey && settings.apiKey.trim().length > 5);
 
@@ -110,8 +114,10 @@ export class LLMService {
     const lastMessage = messages[messages.length - 1];
     const hasImageInActiveQuery = Boolean(lastMessage?.imageUrl);
 
-    let model = settings.modelName || 'nemotron-mini:latest';
+    // Auto-detect best model: if llama3.2 is installed or selected, use it, else nemotron-mini
+    let model = settings.modelName || 'llama3.2:latest';
     if (model === 'llama3.2') model = 'llama3.2:latest';
+    if (model === 'nemotron-mini') model = 'nemotron-mini:latest';
     
     // ONLY switch to vision model if the current query specifically contains an image
     if (hasImageInActiveQuery) {
@@ -121,6 +127,7 @@ export class LLMService {
     const formattedMessages = [
       { role: 'system', content: systemPrompt },
       ...messages
+        .slice(-12) // Keep last 12 rich conversation turns for full context window
         .filter((m) => m.role !== 'system')
         .map((m) => {
           const msgObj: any = { role: m.role, content: m.content || 'Process directive.' };
@@ -139,6 +146,11 @@ export class LLMService {
         model,
         messages: formattedMessages,
         stream: true,
+        options: {
+          temperature: 0.7,
+          top_p: 0.9,
+          num_predict: 2048,
+        },
       }),
     });
 
@@ -149,14 +161,17 @@ export class LLMService {
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
     let accumulated = '';
+    let buffer = '';
 
     if (!reader) throw new Error('Failed to read Ollama stream');
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const chunkText = decoder.decode(value);
-      const lines = chunkText.split('\n');
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
       for (const line of lines) {
         if (line.trim()) {
           try {
@@ -169,6 +184,17 @@ export class LLMService {
           } catch {}
         }
       }
+    }
+
+    if (buffer.trim()) {
+      try {
+        const data = JSON.parse(buffer);
+        const content = data.message?.content || data.response || '';
+        if (content) {
+          accumulated += content;
+          onChunk(content);
+        }
+      } catch {}
     }
 
     if (!accumulated.trim()) {
@@ -204,7 +230,7 @@ export class LLMService {
             });
           }
         }
-        parts.push({ text: m.content || ' ' });
+        parts.push({ text: m.content || 'Process directive.' });
         return {
           role: m.role === 'assistant' ? 'model' : 'user',
           parts,
@@ -230,14 +256,17 @@ export class LLMService {
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
     let accumulated = '';
+    let buffer = '';
 
-    if (!reader) throw new Error('Failed to read response stream');
+    if (!reader) throw new Error('Failed to read Gemini stream');
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const chunkText = decoder.decode(value);
-      const lines = chunkText.split('\n');
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           try {
@@ -251,6 +280,18 @@ export class LLMService {
         }
       }
     }
+
+    if (buffer.startsWith('data: ')) {
+      try {
+        const data = JSON.parse(buffer.slice(6));
+        const textPart = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (textPart) {
+          accumulated += textPart;
+          onChunk(textPart);
+        }
+      } catch {}
+    }
+
     onComplete(accumulated);
   }
 
@@ -316,14 +357,17 @@ export class LLMService {
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
     let accumulated = '';
+    let buffer = '';
 
     if (!reader) throw new Error('Failed to read response stream');
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const chunkText = decoder.decode(value);
-      const lines = chunkText.split('\n');
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
       for (const line of lines) {
         if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
           try {
@@ -382,14 +426,17 @@ export class LLMService {
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
     let accumulated = '';
+    let buffer = '';
 
     if (!reader) throw new Error('Failed to read response stream');
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const chunkText = decoder.decode(value);
-      const lines = chunkText.split('\n');
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           try {
