@@ -1,5 +1,6 @@
 ﻿import { ChatMessage, AppSettings, SoulPreset } from '@/types';
 import { voiceActionService } from '@/services/voiceActionService';
+import { ollamaService } from '@/services/ollamaService';
 
 export class LLMService {
   async sendMessageStream(
@@ -14,7 +15,7 @@ export class LLMService {
     try {
       const lastUserMessage = messages[messages.length - 1]?.content || '';
 
-      // 1. Check for Direct Voice Action Commands (Theme switch, Tab switch, Telemetry, Lock)
+      // 1. Direct Voice Action Router (Theme switch, Tab switch, Telemetry, Lock, Sentry)
       const actionResult = await voiceActionService.processVoiceCommand(lastUserMessage);
       if (actionResult.handled && actionResult.responseMessage) {
         const text = actionResult.responseMessage;
@@ -27,7 +28,7 @@ export class LLMService {
         ? `\n\n[COLLECTIVE MEMORY RECALL]:\n${recalledMemories.map((m, i) => `${i + 1}. ${m}`).join('\n')}`
         : '';
 
-      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, engineered by Sachindra Pandey for nxt IN Company. Style: ${soul.vibe}]${memoryPrompt}\n[RULES: Answer all questions, math, and code generation requests directly and accurately. Never output raw LaTeX delimiters like $$ or \\text in casual math answers.]`;
+      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, engineered by Sachindra Pandey for nxt IN Company. Style: ${soul.vibe}]${memoryPrompt}\n[RULES: Answer all questions, math, and code generation requests directly, intelligently, and accurately. Never output raw LaTeX delimiters like $$ or \\text in casual math answers.]`;
 
       const hasValidKey = Boolean(settings.apiKey && settings.apiKey.trim().length > 5);
 
@@ -37,7 +38,7 @@ export class LLMService {
           await this.callOllamaStream(messages, systemPrompt, settings, onChunk, onComplete);
           return;
         } catch (err: any) {
-          console.warn('Ollama stream failed or loading:', err);
+          console.warn('Ollama stream failed:', err);
         }
       } else if (hasValidKey) {
         if (settings.llmProvider === 'gemini') {
@@ -58,11 +59,75 @@ export class LLMService {
         }
       }
 
-      // If Ollama is offline and no cloud key, run built-in Autonomous Total AI Engine
+      // If Ollama is offline or uninstalled, run built-in Autonomous Total AI Engine
       await this.runAutonomousIntelligenceEngine(messages, soul, recalledMemories, onChunk, onComplete);
     } catch (e: any) {
       onError(e);
     }
+  }
+
+  private async callOllamaStream(
+    messages: ChatMessage[],
+    systemPrompt: string,
+    settings: AppSettings,
+    onChunk: (chunk: string) => void,
+    onComplete: (fullText: string) => void
+  ): Promise<void> {
+    const endpoint = ollamaService.resolveEndpoint(settings.ollamaEndpoint);
+    let model = settings.modelName || 'llama3.2:latest';
+    if (model === 'llama3.2') model = 'llama3.2:latest';
+
+    const formattedMessages = [
+      { role: 'system', content: systemPrompt },
+      ...messages
+        .filter((m) => m.role !== 'system')
+        .map((m) => ({ role: m.role, content: m.content })),
+    ];
+
+    const response = await fetch(`${endpoint}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: formattedMessages,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} from Ollama`);
+    }
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let accumulated = '';
+
+    if (!reader) throw new Error('Failed to read Ollama stream');
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunkText = decoder.decode(value);
+      const lines = chunkText.split('\n');
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            const data = JSON.parse(line);
+            const content = data.message?.content || data.response || '';
+            if (content) {
+              accumulated += content;
+              onChunk(content);
+            }
+          } catch {}
+        }
+      }
+    }
+
+    if (!accumulated.trim()) {
+      throw new Error('Empty response from Ollama');
+    }
+
+    onComplete(accumulated);
   }
 
   private async callGeminiStream(
@@ -290,72 +355,7 @@ export class LLMService {
     onComplete(accumulated);
   }
 
-  private async callOllamaStream(
-    messages: ChatMessage[],
-    systemPrompt: string,
-    settings: AppSettings,
-    onChunk: (chunk: string) => void,
-    onComplete: (fullText: string) => void
-  ): Promise<void> {
-    const endpoint = (settings.ollamaEndpoint || 'http://localhost:11434').replace(/\/+$/, '');
-    let model = settings.modelName || 'llama3.2:latest';
-    if (model === 'llama3.2') model = 'llama3.2:latest';
-
-    const formattedMessages = [
-      { role: 'system', content: systemPrompt },
-      ...messages
-        .filter((m) => m.role !== 'system')
-        .map((m) => ({ role: m.role, content: m.content })),
-    ];
-
-    const controller = new AbortController();
-    // Allow up to 120 seconds for model loading and evaluation
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
-
-    const response = await fetch(`${endpoint}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model,
-        messages: formattedMessages,
-        stream: true,
-      }),
-    });
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} from Ollama`);
-    }
-
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    let accumulated = '';
-
-    if (!reader) throw new Error('Failed to read Ollama stream');
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunkText = decoder.decode(value);
-      const lines = chunkText.split('\n');
-      for (const line of lines) {
-        if (line.trim()) {
-          try {
-            const data = JSON.parse(line);
-            const content = data.message?.content || '';
-            if (content) {
-              accumulated += content;
-              onChunk(content);
-            }
-          } catch {}
-        }
-      }
-    }
-    onComplete(accumulated);
-  }
-
-  // Autonomous Total AI Reasoning & Knowledge Engine
+  // Autonomous Total AI Reasoning & Knowledge Engine (Fallback when offline)
   private async runAutonomousIntelligenceEngine(
     messages: ChatMessage[],
     soul: SoulPreset,
@@ -371,7 +371,7 @@ export class LLMService {
     const isUltron = soul.id.includes('ultron');
     const prefix = isJarvis ? 'Good day, Sir. ' : isUltron ? '' : '';
 
-    // 1. Math Evaluator: Handles "tell me 5 + 7", "what is 2 + 3", "calculate 15 * 8", "100 / 4"
+    // 1. Math Evaluator
     const simpleMathMatch = rawMsg.match(/(\d+(?:\.\d+)?)\s*([\+\-\*\/xX])\s*(\d+(?:\.\d+)?)/);
     if (simpleMathMatch) {
       const num1 = parseFloat(simpleMathMatch[1]);
@@ -391,99 +391,67 @@ export class LLMService {
         : `${num1} ${op} ${num2} = ${res}`;
     }
 
-    // 2. Code Generation & Programming Tasks
-    if (!answer) {
-      if (q.includes('code') || q.includes('java') || q.includes('python') || q.includes('javascript') || q.includes('c++') || q.includes('cpp') || q.includes('function') || q.includes('add two numbers')) {
-        if (q.includes('java')) {
-          answer = `${prefix}Here is the complete Java program to add two numbers:\n\n` +
-            '```java\n' +
-            'import java.util.Scanner;\n\n' +
-            'public class AddTwoNumbers {\n' +
-            '    public static void main(String[] args) {\n' +
-            '        Scanner sc = new Scanner(System.in);\n' +
-            '        System.out.print("Enter first number: ");\n' +
-            '        int num1 = sc.nextInt();\n' +
-            '        System.out.print("Enter second number: ");\n' +
-            '        int num2 = sc.nextInt();\n\n' +
-            '        int sum = num1 + num2;\n' +
-            '        System.out.println("The sum of " + num1 + " and " + num2 + " is: " + sum);\n' +
-            '        sc.close();\n' +
-            '    }\n' +
-            '}\n' +
-            '```\n\n' +
-            '**How it works:**\n' +
-            '1. Uses `Scanner` to read user input from the console.\n' +
-            '2. Adds `num1` and `num2` using the `+` operator.\n' +
-            '3. Prints the calculated sum directly to standard output.';
-        } else if (q.includes('python')) {
-          answer = `${prefix}Here is the Python implementation:\n\n` +
-            '```python\n' +
-            'def add_numbers(a: float, b: float) -> float:\n' +
-            '    """Calculate and return the sum of two numbers."""\n' +
-            '    return a + b\n\n' +
-            'if __name__ == "__main__":\n' +
-            '    n1 = float(input("Enter first number: "))\n' +
-            '    n2 = float(input("Enter second number: "))\n' +
-            '    print(f"The sum of {n1} and {n2} is {add_numbers(n1, n2)}")\n' +
-            '```';
-        } else if (q.includes('c++') || q.includes('cpp')) {
-          answer = `${prefix}Here is the C++ program:\n\n` +
-            '```cpp\n' +
-            '#include <iostream>\n' +
-            'using namespace std;\n\n' +
-            'int main() {\n' +
-            '    double a, b;\n' +
-            '    cout << "Enter two numbers: ";\n' +
-            '    cin >> a >> b;\n' +
-            '    cout << "Sum: " << (a + b) << endl;\n' +
-            '    return 0;\n' +
-            '}\n' +
-            '```';
-        } else {
-          answer = `${prefix}Here is the JavaScript/TypeScript function:\n\n` +
-            '```typescript\n' +
-            'export function addNumbers(a: number, b: number): number {\n' +
-            '  return a + b;\n' +
-            '}\n\n' +
-            'console.log("Sum result:", addNumbers(5, 7)); // Output: 12\n' +
-            '```';
-        }
-      }
+    // 2. Hand Gesture Instructions
+    if (!answer && (q.includes('hand') || q.includes('gesture') || q.includes('control') || q.includes('orb'))) {
+      answer = `${prefix}Here is how to control the 3D Hologram Orb using Hand Gestures:\n\n` +
+        `1. **Turn On Camera**: Press \`G\` on your keyboard or click the **\`GESTURES OFF\`** button at the bottom.\n` +
+        `2. **1-Hand Pinch & Rotate**: Pinch your thumb and index finger together with one hand and drag in 3D space to spin the Orb.\n` +
+        `3. **2-Hand Pinch & Zoom**: Pinch with both hands and spread your hands apart to zoom into the holographic core.`;
     }
 
-    // 3. System & Telemetry Queries
-    if (!answer) {
-      if (q.includes('battery') || q.includes('cpu') || q.includes('telemetry') || q.includes('system') || q.includes('specs') || q.includes('status')) {
-        answer = `${prefix}Here is your live laptop telemetry diagnosis:\n\n` +
-          `• Holographic Orb Matrix: 60 FPS WebGL2 Render Online\n` +
-          `• Gesture Engine: MediaPipe Vision Active\n` +
-          `• Voice Engine: Movie-Grade Real-Time Synthesizer Active\n` +
-          `• Memory Bank: Active (${recalledMemories.length} memories recalled)\n` +
-          `• Active Persona: ${soul.name} ${soul.emoji}`;
-      }
-    }
-
-    // 4. General Knowledge & Definitions
-    if (!answer) {
-      if (q.includes('who are you') || q.includes('your name') || q.includes('who made you') || q.includes('creator') || q.includes('identity')) {
-        answer = `I am **${soul.name}**, an autonomous desktop AI assistant created and engineered by **Sachindra Pandey for nxt IN Company**. I combine spatial 3D holographic rendering, persistent collective memory, and real-time voice controls to assist you across your desktop.`;
-      } else if (q.includes('gravity') || q.includes('physics')) {
-        answer = `${prefix}Gravity is a fundamental natural force by which all objects with mass or energy are drawn toward one another. In Einstein's General Relativity, gravity is described as the curvature of spacetime caused by mass and energy.`;
-      } else if (q.includes('ai') || q.includes('machine learning') || q.includes('neural')) {
-        answer = `${prefix}Artificial Intelligence represents computing systems capable of learning, reasoning, perception, and problem solving. Ultron unifies spatial 3D interfaces with local neural models and persistent memory.`;
-      } else if (q.includes('joke') || q.includes('funny')) {
-        answer = isJarvis
-          ? `Why do programmers prefer dark mode, Sir? Because light attracts bugs.`
-          : `Why do computers always eat their snacks? Because they have byte-sized chips.`;
-      } else if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
-        answer = `${prefix}Greetings. **${soul.name}** neural matrix is fully synchronized. How may I assist your engineering and computing tasks today?`;
+    // 3. Code Generation
+    if (!answer && (q.includes('code') || q.includes('java') || q.includes('python') || q.includes('optimize') || q.includes('shader') || q.includes('script'))) {
+      if (q.includes('shader') || q.includes('optimize')) {
+        answer = `${prefix}Here is an optimized Three.js WebGL shader with hardware-accelerated vertex transformation:\n\n` +
+          '```typescript\n' +
+          'import * as THREE from "three";\n\n' +
+          'export const optimizedHologram = new THREE.ShaderMaterial({\n' +
+          '  uniforms: {\n' +
+          '    uTime: { value: 0 },\n' +
+          '    uColor: { value: new THREE.Color(0x00f3ff) }\n' +
+          '  },\n' +
+          '  vertexShader: `\n' +
+          '    varying vec3 vNormal;\n' +
+          '    void main() {\n' +
+          '      vNormal = normalize(normalMatrix * normal);\n' +
+          '      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n' +
+          '    }\n' +
+          '  `,\n' +
+          '  fragmentShader: `\n' +
+          '    uniform vec3 uColor;\n' +
+          '    varying vec3 vNormal;\n' +
+          '    void main() {\n' +
+          '      float intensity = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.5);\n' +
+          '      gl_FragColor = vec4(uColor * intensity, intensity * 0.9);\n' +
+          '    }\n' +
+          '  `,\n' +
+          '  transparent: true,\n' +
+          '  blending: THREE.AdditiveBlending\n' +
+          '});\n' +
+          '```';
       } else {
-        answer = `${prefix}I have processed your query: "${rawMsg.trim()}".\n\n` +
-          `The **${soul.name}** neural core is active. I can solve mathematical equations, write code in Java, Python, C++, or TypeScript, switch UI themes, and automate system tasks. Let me know what specific task you want to execute!`;
+        answer = `${prefix}Here is the complete Java program:\n\n` +
+          '```java\n' +
+          'import java.util.Scanner;\n\n' +
+          'public class AddNumbers {\n' +
+          '    public static void main(String[] args) {\n' +
+          '        Scanner sc = new Scanner(System.in);\n' +
+          '        System.out.print("Enter first number: ");\n' +
+          '        int a = sc.nextInt();\n' +
+          '        System.out.print("Enter second number: ");\n' +
+          '        int b = sc.nextInt();\n' +
+          '        System.out.println("Result: " + (a + b));\n' +
+          '        sc.close();\n' +
+          '    }\n' +
+          '}\n' +
+          '```';
       }
     }
 
-    // Stream the generated answer with natural pacing
+    if (!answer) {
+      answer = `${prefix}I am analyzing: "${rawMsg.trim()}". The neural matrix is active and ready for calculations, code generation, diagnostics, or system control.`;
+    }
+
     const words = answer.split(' ');
     let current = '';
     for (let i = 0; i < words.length; i++) {

@@ -22,65 +22,48 @@ export interface OllamaStatus {
 class OllamaService {
   private defaultEndpoint = 'http://localhost:11434';
 
-  async checkStatus(endpoint = this.defaultEndpoint): Promise<OllamaStatus> {
-    try {
-      const cleanEndpoint = endpoint.replace(/\/+$/, '');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
-
-      const res = await fetch(`${cleanEndpoint}/api/tags`, {
-        method: 'GET',
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const data = await res.json();
-        const models = (data.models || []).map((m: OllamaModelInfo) => m.name || m.model);
-        return {
-          isOnline: true,
-          endpoint: cleanEndpoint,
-          models,
-          activeModel: models[0] || 'llama3',
-        };
-      } else {
-        return {
-          isOnline: false,
-          endpoint: cleanEndpoint,
-          models: [],
-          activeModel: '',
-          error: `HTTP ${res.status}`,
-        };
-      }
-    } catch (e: any) {
-      return {
-        isOnline: false,
-        endpoint,
-        models: [],
-        activeModel: '',
-        error: e.message || 'Connection refused',
-      };
+  resolveEndpoint(endpoint?: string): string {
+    const ep = endpoint || this.defaultEndpoint;
+    if (typeof window !== 'undefined' && (ep.includes('localhost:11434') || ep.includes('127.0.0.1:11434'))) {
+      return '/ollama';
     }
+    return ep.replace(/\/+$/, '');
   }
 
-  async testPrompt(modelName: string, prompt: string, endpoint = this.defaultEndpoint): Promise<string> {
-    const cleanEndpoint = endpoint.replace(/\/+$/, '');
-    const res = await fetch(`${cleanEndpoint}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: modelName,
-        prompt,
-        stream: false,
-      }),
-    });
+  async checkStatus(endpoint = this.defaultEndpoint): Promise<OllamaStatus> {
+    const urlsToTry = [this.resolveEndpoint(endpoint), endpoint.replace(/\/+$/, '')];
 
-    if (!res.ok) {
-      throw new Error(`Ollama generate error: ${res.statusText}`);
+    for (const url of urlsToTry) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+        const res = await fetch(`${url}/api/tags`, {
+          method: 'GET',
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const models = (data.models || []).map((m: OllamaModelInfo) => m.name || m.model);
+          return {
+            isOnline: true,
+            endpoint: url,
+            models,
+            activeModel: models[0] || 'llama3.2:latest',
+          };
+        }
+      } catch {}
     }
 
-    const data = await res.json();
-    return data.response || '';
+    return {
+      isOnline: false,
+      endpoint,
+      models: [],
+      activeModel: '',
+      error: 'Connection refused',
+    };
   }
 }
 
