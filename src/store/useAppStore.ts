@@ -13,7 +13,7 @@ import { CORE_SOUL_PRESETS } from '@/services/soulService';
 import { memoryService } from '@/services/memoryService';
 import { BUILTIN_SKILLS, osService } from '@/services/osService';
 
-export type ActiveTab = 'orb' | 'chat' | 'terminal' | 'memory' | 'skills' | 'harness' | 'settings';
+export type ActiveTab = 'orb' | 'chat' | 'terminal' | 'swarm' | 'memory' | 'skills' | 'harness' | 'settings';
 
 interface AppState {
   activeTab: ActiveTab;
@@ -62,6 +62,9 @@ interface AppState {
 
   isSentryActive: boolean;
   setIsSentryActive: (active: boolean) => void;
+
+  isHandsFreeActive: boolean;
+  setIsHandsFreeActive: (active: boolean) => void;
 
   isEnrollModalOpen: boolean;
   setIsEnrollModalOpen: (open: boolean) => void;
@@ -151,6 +154,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   isSentryActive: false,
   setIsSentryActive: (active) => set({ isSentryActive: active }),
+
+  isHandsFreeActive: false,
+  setIsHandsFreeActive: (active) => set({ isHandsFreeActive: active }),
 
   isEnrollModalOpen: false,
   setIsEnrollModalOpen: (open) => set({ isEnrollModalOpen: open }),

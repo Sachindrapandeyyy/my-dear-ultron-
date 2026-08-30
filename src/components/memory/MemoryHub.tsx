@@ -15,15 +15,19 @@ import {
   Settings,
   Workflow,
   Sparkles,
+  Network,
+  List,
 } from 'lucide-react';
 import { memoryService } from '@/services/memoryService';
 import { audioService } from '@/services/audioService';
+import { NeuralMemoryGraph3D } from '@/components/memory/NeuralMemoryGraph3D';
 
 export const MemoryHub: React.FC = () => {
   const { theme, memories, refreshMemories, addMemory, deleteMemory, settings } = useAppStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'3d' | 'list'>('3d');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Form State for new memory
@@ -119,6 +123,38 @@ export const MemoryHub: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* View Mode Switcher */}
+          <div className="flex items-center p-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs">
+            <button
+              onClick={() => {
+                if (settings.soundEffects) audioService.playClickSound();
+                setViewMode('3d');
+              }}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded transition-all font-bold ${
+                viewMode === '3d'
+                  ? 'bg-cyan-500 text-black shadow-[0_0_10px_rgba(0,243,255,0.4)]'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Network className="w-3.5 h-3.5" />
+              <span>3D MIND-MAP</span>
+            </button>
+            <button
+              onClick={() => {
+                if (settings.soundEffects) audioService.playClickSound();
+                setViewMode('list');
+              }}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded transition-all font-bold ${
+                viewMode === 'list'
+                  ? 'bg-zinc-800 text-white border border-zinc-700'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              <span>LIST</span>
+            </button>
+          </div>
+
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-bold text-xs transition-all"
@@ -193,62 +229,66 @@ export const MemoryHub: React.FC = () => {
         </div>
       </div>
 
-      {/* Memories Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredMemories.map((mem) => (
-          <div
-            key={mem.id}
-            className="p-4 rounded-lg bg-zinc-950/90 border border-zinc-800 hover:border-zinc-700 transition-all group relative flex flex-col justify-between"
-          >
-            <div>
-              {/* Header */}
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-300">
-                  {mem.category}
-                </span>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 text-[11px] text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800/40">
-                    <Flame className="w-3 h-3" />
-                    <span>{mem.hitCount} hits</span>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      if (settings.soundEffects) audioService.playClickSound();
-                      deleteMemory(mem.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-red-400 transition-opacity"
-                    title="Delete Memory"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Title */}
-              <h3 className="text-sm font-bold text-white mb-1.5 leading-snug">{mem.title}</h3>
-
-              {/* Content */}
-              <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">{mem.content}</p>
-            </div>
-
-            {/* Tags footer */}
-            {mem.tags.length > 0 && (
-              <div className="mt-3 pt-2 border-t border-zinc-800/80 flex flex-wrap gap-1">
-                {mem.tags.map((t, idx) => (
-                  <span
-                    key={idx}
-                    className="text-[10px] text-zinc-400 bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800"
-                  >
-                    #{t}
+      {/* Memories View (3D Mind-Map or List) */}
+      {viewMode === '3d' ? (
+        <NeuralMemoryGraph3D memories={filteredMemories} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredMemories.map((mem) => (
+            <div
+              key={mem.id}
+              className="p-4 rounded-lg bg-zinc-950/90 border border-zinc-800 hover:border-zinc-700 transition-all group relative flex flex-col justify-between"
+            >
+              <div>
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-300">
+                    {mem.category}
                   </span>
-                ))}
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 text-[11px] text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800/40">
+                      <Flame className="w-3 h-3" />
+                      <span>{mem.hitCount} hits</span>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (settings.soundEffects) audioService.playClickSound();
+                        deleteMemory(mem.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-red-400 transition-opacity"
+                      title="Delete Memory"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Title */}
+                <h3 className="text-sm font-bold text-white mb-1.5 leading-snug">{mem.title}</h3>
+
+                {/* Content */}
+                <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">{mem.content}</p>
               </div>
-            )}
-          </div>
-        ))}
-      </div>
+
+              {/* Tags footer */}
+              {mem.tags.length > 0 && (
+                <div className="mt-3 pt-2 border-t border-zinc-800/80 flex flex-wrap gap-1">
+                  {mem.tags.map((t, idx) => (
+                    <span
+                      key={idx}
+                      className="text-[10px] text-zinc-400 bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800"
+                    >
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {filteredMemories.length === 0 && (
         <div className="text-center py-16 border border-dashed border-zinc-800 rounded-lg">

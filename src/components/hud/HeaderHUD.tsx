@@ -23,6 +23,8 @@ import {
   ShieldAlert,
   Lock as LockIcon,
   Music,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 import { audioService } from '@/services/audioService';
 import { ollamaService, OllamaStatus } from '@/services/ollamaService';
@@ -104,9 +106,10 @@ export const HeaderHUD: React.FC = () => {
     { id: 'orb', label: 'ORB MATRIX', icon: Globe },
     { id: 'chat', label: 'NEURAL CHAT', icon: MessageSquare },
     { id: 'terminal', label: 'TERMINAL', icon: Server },
+    { id: 'swarm', label: 'AI SWARM', icon: Users },
     { id: 'memory', label: 'MEMORY HUB', icon: Database },
     { id: 'skills', label: 'SKILLS & OS', icon: Wrench },
-    { id: 'harness', label: 'SOUL PRESETS', icon: Users },
+    { id: 'harness', label: 'SOULS', icon: Users },
     { id: 'settings', label: 'SETTINGS', icon: Settings },
   ];
 
@@ -190,6 +193,29 @@ export const HeaderHUD: React.FC = () => {
 
         {/* Right: Security, Phone Sync, Telemetry & Themes */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Hands-Free Wake Word Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              if (settings.soundEffects) audioService.playClickSound();
+              const next = !useAppStore.getState().isHandsFreeActive;
+              useAppStore.getState().setIsHandsFreeActive(next);
+            }}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded border text-xs font-mono transition-all ${
+              useAppStore.getState().isHandsFreeActive
+                ? 'bg-emerald-950/80 border-emerald-500 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-pulse'
+                : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-400'
+            }`}
+            title="Toggle Hands-Free Wake Word Mode ('Hey Ultron' / 'Jarvis')"
+          >
+            {useAppStore.getState().isHandsFreeActive ? (
+              <Mic className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <MicOff className="w-3.5 h-3.5" />
+            )}
+            <span className="hidden md:inline">HANDS-FREE</span>
+          </button>
+
           {/* Sentry Mode Toggle */}
           <button
             type="button"

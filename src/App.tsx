@@ -12,6 +12,8 @@ import { InteractiveTerminal } from '@/components/terminal/InteractiveTerminal';
 import { FaceLockScreen } from '@/components/security/FaceLockScreen';
 import { FaceEnrollModal } from '@/components/security/FaceEnrollModal';
 import { YouTubeCyberPlayer } from '@/components/music/YouTubeCyberPlayer';
+import { HandsFreeVoiceController } from '@/components/voice/HandsFreeVoiceController';
+import { SubagentSwarmHub } from '@/components/swarm/SubagentSwarmHub';
 import { audioService } from '@/services/audioService';
 
 export const App: React.FC = () => {
@@ -68,6 +70,7 @@ export const App: React.FC = () => {
           <div className="absolute inset-0 overflow-y-auto bg-black/90 backdrop-blur-md z-10 animate-fadeIn">
             {activeTab === 'chat' && <ChatConsole />}
             {activeTab === 'terminal' && <InteractiveTerminal />}
+            {activeTab === 'swarm' && <SubagentSwarmHub />}
             {activeTab === 'memory' && <MemoryHub />}
             {activeTab === 'skills' && <SkillHub />}
             {activeTab === 'harness' && <HarnessSelector />}
@@ -84,6 +87,9 @@ export const App: React.FC = () => {
 
       {/* Biometric Face ID Enrollment Modal */}
       {isEnrollModalOpen && <FaceEnrollModal />}
+
+      {/* Hands-Free Wake-Word & Full-Duplex Voice Controller */}
+      <HandsFreeVoiceController />
 
       {/* Floating Holographic YouTube Music & Video Cyber-Dock */}
       <YouTubeCyberPlayer />
