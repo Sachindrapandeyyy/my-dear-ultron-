@@ -1,9 +1,8 @@
-import React from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useAppStore, ActiveTab } from '@/store/useAppStore';
 import { ORB_THEMES } from '@/lib/orb/theme';
 import {
   Cpu,
-  Zap,
   Battery,
   BatteryCharging,
   Activity,
@@ -14,8 +13,10 @@ import {
   Users,
   Settings,
   Radio,
+  Server,
 } from 'lucide-react';
 import { audioService } from '@/services/audioService';
+import { ollamaService, OllamaStatus } from '@/services/ollamaService';
 import { OrbTheme } from '@/types';
 
 export const HeaderHUD: React.FC = () => {
@@ -28,9 +29,28 @@ export const HeaderHUD: React.FC = () => {
     agentState,
     telemetry,
     settings,
+    updateSettings,
   } = useAppStore();
 
+  const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus>({
+    isOnline: false,
+    endpoint: 'http://localhost:11434',
+    models: [],
+    activeModel: '',
+  });
+
   const themeConfig = ORB_THEMES[theme];
+
+  // Auto-detect local Ollama
+  useEffect(() => {
+    const checkOllama = async () => {
+      const status = await ollamaService.checkStatus(settings.ollamaEndpoint);
+      setOllamaStatus(status);
+    };
+    checkOllama();
+    const interval = setInterval(checkOllama, 6000);
+    return () => clearInterval(interval);
+  }, [settings.ollamaEndpoint]);
 
   const handleTabClick = (tab: ActiveTab) => {
     if (settings.soundEffects) audioService.playClickSound();
@@ -40,6 +60,18 @@ export const HeaderHUD: React.FC = () => {
   const handleThemeChange = (newTheme: OrbTheme) => {
     if (settings.soundEffects) audioService.playClickSound();
     setTheme(newTheme);
+  };
+
+  const handleToggleOllama = () => {
+    if (settings.soundEffects) audioService.playClickSound();
+    if (settings.llmProvider === 'ollama') {
+      updateSettings({ llmProvider: 'gemini' });
+    } else {
+      updateSettings({
+        llmProvider: 'ollama',
+        modelName: ollamaStatus.models[0] || 'llama3',
+      });
+    }
   };
 
   const navItems: { id: ActiveTab; label: string; icon: any }[] = [
@@ -53,7 +85,7 @@ export const HeaderHUD: React.FC = () => {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-30 flex flex-col md:flex-row items-center justify-between px-4 py-2.5 bg-black/60 backdrop-blur-md border-b border-zinc-800/80 select-none">
-      {/* Left: Brand + Active Persona */}
+      {/* Left: Brand + Active Persona + Ollama Quick Indicator */}
       <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
         <div
           className="flex items-center gap-2 cursor-pointer group"
@@ -81,6 +113,22 @@ export const HeaderHUD: React.FC = () => {
             <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse ml-1" />
           )}
         </div>
+
+        {/* Local Ollama Live Badge */}
+        {ollamaStatus.isOnline && (
+          <button
+            onClick={handleToggleOllama}
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer ${
+              settings.llmProvider === 'ollama'
+                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/80 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                : 'bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-emerald-300'
+            }`}
+            title="Click to toggle Local Ollama AI"
+          >
+            <Server className="w-3 h-3 text-emerald-400" />
+            <span className="font-bold">OLLAMA: {ollamaStatus.activeModel || 'READY'}</span>
+          </button>
+        )}
       </div>
 
       {/* Center: Futuristic Navigation Tabs */}
