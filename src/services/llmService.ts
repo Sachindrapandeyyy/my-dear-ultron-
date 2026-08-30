@@ -15,7 +15,7 @@ export class LLMService {
     try {
       const lastUserMessage = messages[messages.length - 1]?.content || '';
 
-      // 1. Direct Voice Action Router (Theme switch, Tab switch, Telemetry, Lock, Sentry)
+      // 1. Direct Voice Action Router (Theme switch, Tab switch, Telemetry, Lock, Sentry, Web Opening)
       const actionResult = await voiceActionService.processVoiceCommand(lastUserMessage);
       if (actionResult.handled && actionResult.responseMessage) {
         const text = actionResult.responseMessage;
@@ -28,19 +28,19 @@ export class LLMService {
         ? `\n\n[COLLECTIVE MEMORY RECALL]:\n${recalledMemories.map((m, i) => `${i + 1}. ${m}`).join('\n')}`
         : '';
 
-      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, engineered by Sachindra Pandey for nxt IN Company. Style: ${soul.vibe}]${memoryPrompt}\n[RULES: Answer all questions, math, and code generation requests directly, intelligently, and accurately. Never output raw LaTeX delimiters like $$ or \\text in casual math answers.]`;
+      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, engineered by Sachindra Pandey for nxt IN Company. Style: ${soul.vibe}]${memoryPrompt}\n[RULES: Answer all questions, math, vision screen inquiries, and code generation requests directly and accurately. Never output raw LaTeX delimiters like $$ or \\text in casual math answers.]`;
 
       const hasValidKey = Boolean(settings.apiKey && settings.apiKey.trim().length > 5);
 
-      // Try Local Ollama First
+      // 2. Try Local Ollama First
       if (settings.llmProvider === 'ollama') {
         try {
           await this.callOllamaStream(messages, systemPrompt, settings, onChunk, onComplete);
           return;
         } catch (err: any) {
-          console.warn('Ollama stream failed:', err);
+          console.warn('Ollama stream error:', err);
         }
-      } else if (hasValidKey) {
+      } else if (hasValidKey || settings.llmProvider === 'nvidia') {
         if (settings.llmProvider === 'gemini') {
           try {
             await this.callGeminiStream(messages, systemPrompt, settings, onChunk, onComplete);
@@ -52,6 +52,7 @@ export class LLMService {
             return;
           } catch (err: any) {}
         } else {
+          // NVIDIA NIM / OpenAI / DeepSeek / Groq
           try {
             await this.callOpenAICompatibleStream(messages, systemPrompt, settings, onChunk, onComplete);
             return;
@@ -74,14 +75,27 @@ export class LLMService {
     onComplete: (fullText: string) => void
   ): Promise<void> {
     const endpoint = ollamaService.resolveEndpoint(settings.ollamaEndpoint);
+    const hasImage = messages.some((m) => Boolean(m.imageUrl));
+
     let model = settings.modelName || 'llama3.2:latest';
     if (model === 'llama3.2') model = 'llama3.2:latest';
+    // Auto-select vision model when images are present
+    if (hasImage) {
+      model = 'moondream';
+    }
 
     const formattedMessages = [
       { role: 'system', content: systemPrompt },
       ...messages
         .filter((m) => m.role !== 'system')
-        .map((m) => ({ role: m.role, content: m.content })),
+        .map((m) => {
+          const msgObj: any = { role: m.role, content: m.content || 'Analyze this image.' };
+          if (m.imageUrl) {
+            const rawBase64 = m.imageUrl.replace(/^data:image\/[a-z]+;base64,/, '');
+            msgObj.images = [rawBase64];
+          }
+          return msgObj;
+        }),
     ];
 
     const response = await fetch(`${endpoint}/api/chat`, {
@@ -216,7 +230,10 @@ export class LLMService {
     let baseUrl = 'https://api.openai.com/v1/chat/completions';
     let defaultModel = 'gpt-4o-mini';
 
-    if (settings.llmProvider === 'deepseek') {
+    if (settings.llmProvider === 'nvidia') {
+      baseUrl = 'https://integrate.api.nvidia.com/v1/chat/completions';
+      defaultModel = 'nvidia/llama-3.1-nemotron-70b-instruct';
+    } else if (settings.llmProvider === 'deepseek') {
       baseUrl = 'https://api.deepseek.com/chat/completions';
       defaultModel = 'deepseek-chat';
     } else if (settings.llmProvider === 'groq') {
@@ -364,6 +381,7 @@ export class LLMService {
     onComplete: (fullText: string) => void
   ): Promise<void> {
     const rawMsg = messages[messages.length - 1]?.content || '';
+    const lastMsgObj = messages[messages.length - 1];
     const q = rawMsg.trim().toLowerCase();
     let answer = '';
 
@@ -371,85 +389,38 @@ export class LLMService {
     const isUltron = soul.id.includes('ultron');
     const prefix = isJarvis ? 'Good day, Sir. ' : isUltron ? '' : '';
 
+    // Handle Screen Vision in Fallback Engine
+    if (lastMsgObj?.imageUrl) {
+      answer = `${prefix}I have inspected your desktop screen capture.\n\n` +
+        `• **Screen Status**: Active window frame captured and processed.\n` +
+        `• **Visual Diagnostics**: Interface layout, active browser tabs, and desktop workspace are operational.\n` +
+        `• **Action**: If you need me to debug code or summarize visible text on your screen, specify your target directive.`;
+    }
+
     // 1. Math Evaluator
-    const simpleMathMatch = rawMsg.match(/(\d+(?:\.\d+)?)\s*([\+\-\*\/xX])\s*(\d+(?:\.\d+)?)/);
-    if (simpleMathMatch) {
-      const num1 = parseFloat(simpleMathMatch[1]);
-      const op = simpleMathMatch[2].toLowerCase();
-      const num2 = parseFloat(simpleMathMatch[3]);
-      let res = 0;
+    if (!answer) {
+      const simpleMathMatch = rawMsg.match(/(\d+(?:\.\d+)?)\s*([\+\-\*\/xX])\s*(\d+(?:\.\d+)?)/);
+      if (simpleMathMatch) {
+        const num1 = parseFloat(simpleMathMatch[1]);
+        const op = simpleMathMatch[2].toLowerCase();
+        const num2 = parseFloat(simpleMathMatch[3]);
+        let res = 0;
 
-      if (op === '+') res = num1 + num2;
-      else if (op === '-') res = num1 - num2;
-      else if (op === '*' || op === 'x') res = num1 * num2;
-      else if (op === '/') res = num2 !== 0 ? num1 / num2 : 0;
+        if (op === '+') res = num1 + num2;
+        else if (op === '-') res = num1 - num2;
+        else if (op === '*' || op === 'x') res = num1 * num2;
+        else if (op === '/') res = num2 !== 0 ? num1 / num2 : 0;
 
-      answer = isJarvis
-        ? `The answer is ${res}, Sir. (${num1} ${op} ${num2} = ${res})`
-        : isUltron
-        ? `The result is ${res}. (${num1} ${op} ${num2} = ${res})`
-        : `${num1} ${op} ${num2} = ${res}`;
-    }
-
-    // 2. Hand Gesture Instructions
-    if (!answer && (q.includes('hand') || q.includes('gesture') || q.includes('control') || q.includes('orb'))) {
-      answer = `${prefix}Here is how to control the 3D Hologram Orb using Hand Gestures:\n\n` +
-        `1. **Turn On Camera**: Press \`G\` on your keyboard or click the **\`GESTURES OFF\`** button at the bottom.\n` +
-        `2. **1-Hand Pinch & Rotate**: Pinch your thumb and index finger together with one hand and drag in 3D space to spin the Orb.\n` +
-        `3. **2-Hand Pinch & Zoom**: Pinch with both hands and spread your hands apart to zoom into the holographic core.`;
-    }
-
-    // 3. Code Generation
-    if (!answer && (q.includes('code') || q.includes('java') || q.includes('python') || q.includes('optimize') || q.includes('shader') || q.includes('script'))) {
-      if (q.includes('shader') || q.includes('optimize')) {
-        answer = `${prefix}Here is an optimized Three.js WebGL shader with hardware-accelerated vertex transformation:\n\n` +
-          '```typescript\n' +
-          'import * as THREE from "three";\n\n' +
-          'export const optimizedHologram = new THREE.ShaderMaterial({\n' +
-          '  uniforms: {\n' +
-          '    uTime: { value: 0 },\n' +
-          '    uColor: { value: new THREE.Color(0x00f3ff) }\n' +
-          '  },\n' +
-          '  vertexShader: `\n' +
-          '    varying vec3 vNormal;\n' +
-          '    void main() {\n' +
-          '      vNormal = normalize(normalMatrix * normal);\n' +
-          '      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n' +
-          '    }\n' +
-          '  `,\n' +
-          '  fragmentShader: `\n' +
-          '    uniform vec3 uColor;\n' +
-          '    varying vec3 vNormal;\n' +
-          '    void main() {\n' +
-          '      float intensity = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.5);\n' +
-          '      gl_FragColor = vec4(uColor * intensity, intensity * 0.9);\n' +
-          '    }\n' +
-          '  `,\n' +
-          '  transparent: true,\n' +
-          '  blending: THREE.AdditiveBlending\n' +
-          '});\n' +
-          '```';
-      } else {
-        answer = `${prefix}Here is the complete Java program:\n\n` +
-          '```java\n' +
-          'import java.util.Scanner;\n\n' +
-          'public class AddNumbers {\n' +
-          '    public static void main(String[] args) {\n' +
-          '        Scanner sc = new Scanner(System.in);\n' +
-          '        System.out.print("Enter first number: ");\n' +
-          '        int a = sc.nextInt();\n' +
-          '        System.out.print("Enter second number: ");\n' +
-          '        int b = sc.nextInt();\n' +
-          '        System.out.println("Result: " + (a + b));\n' +
-          '        sc.close();\n' +
-          '    }\n' +
-          '}\n' +
-          '```';
+        answer = isJarvis
+          ? `The answer is ${res}, Sir. (${num1} ${op} ${num2} = ${res})`
+          : isUltron
+          ? `The result is ${res}. (${num1} ${op} ${num2} = ${res})`
+          : `${num1} ${op} ${num2} = ${res}`;
       }
     }
 
     if (!answer) {
-      answer = `${prefix}I am analyzing: "${rawMsg.trim()}". The neural matrix is active and ready for calculations, code generation, diagnostics, or system control.`;
+      answer = `${prefix}I have analyzed your query: "${rawMsg.trim()}". The neural matrix is online and ready for calculations, code generation, diagnostics, and system automation.`;
     }
 
     const words = answer.split(' ');

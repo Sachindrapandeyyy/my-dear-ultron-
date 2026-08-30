@@ -65,7 +65,7 @@ export interface ChatMessage {
 }
 
 export interface AppSettings {
-  llmProvider: 'gemini' | 'openai' | 'claude' | 'deepseek' | 'groq' | 'ollama';
+  llmProvider: 'gemini' | 'openai' | 'claude' | 'deepseek' | 'groq' | 'ollama' | 'nvidia';
   apiKey: string;
   modelName: string;
   ollamaEndpoint: string;
