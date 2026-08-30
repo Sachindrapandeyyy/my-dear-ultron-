@@ -8,6 +8,7 @@ import { MemoryHub } from '@/components/memory/MemoryHub';
 import { SkillHub } from '@/components/skills/SkillHub';
 import { HarnessSelector } from '@/components/harness/HarnessSelector';
 import { SettingsModal } from '@/components/settings/SettingsModal';
+import { InteractiveTerminal } from '@/components/terminal/InteractiveTerminal';
 import { audioService } from '@/services/audioService';
 
 export const App: React.FC = () => {
@@ -57,6 +58,7 @@ export const App: React.FC = () => {
         {activeTab !== 'orb' && (
           <div className="absolute inset-0 overflow-y-auto bg-black/90 backdrop-blur-md z-10 animate-fadeIn">
             {activeTab === 'chat' && <ChatConsole />}
+            {activeTab === 'terminal' && <InteractiveTerminal />}
             {activeTab === 'memory' && <MemoryHub />}
             {activeTab === 'skills' && <SkillHub />}
             {activeTab === 'harness' && <HarnessSelector />}

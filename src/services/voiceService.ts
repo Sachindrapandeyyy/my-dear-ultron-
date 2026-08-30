@@ -1,4 +1,4 @@
-export interface VoiceOption {
+﻿export interface VoiceOption {
   name: string;
   lang: string;
   voiceURI: string;
@@ -18,33 +18,33 @@ export interface VoicePresetConfig {
 export const VOICE_PERSONA_PRESETS: Record<VoicePersonaPreset, VoicePresetConfig> = {
   jarvis: {
     id: 'jarvis',
-    name: 'J.A.R.V.I.S. (British Butler)',
+    name: 'J.A.R.V.I.S. (Stark British Butler)',
     description: 'Refined, calm, British engineering butler cadence',
-    rate: 1.02,
+    rate: 1.05,
     pitch: 0.88,
     gender: 'male',
   },
   ultron: {
     id: 'ultron',
-    name: 'U.L.T.R.O.N. (Deep Robotic Baritone)',
+    name: 'U.L.T.R.O.N. (Deep Cybernetic Baritone)',
     description: 'Commanding, deep synthetic baritone with gravitas',
-    rate: 0.92,
+    rate: 0.94,
     pitch: 0.72,
     gender: 'robotic',
   },
   friday: {
     id: 'friday',
-    name: 'F.R.I.D.A.Y. (Natural Assistant)',
-    description: 'Crisp, upbeat, natural tactical assistant',
-    rate: 1.05,
-    pitch: 1.08,
+    name: 'F.R.I.D.A.Y. (Irish/Natural Assistant)',
+    description: 'Crisp, natural, upbeat tactical assistant',
+    rate: 1.06,
+    pitch: 1.05,
     gender: 'female',
   },
   cyber: {
     id: 'cyber',
     name: 'NETRUNNER (Fast Synth)',
     description: 'High-speed synthwave netrunner cadence',
-    rate: 1.18,
+    rate: 1.15,
     pitch: 1.12,
     gender: 'male',
   },
@@ -63,6 +63,7 @@ class VoiceService {
   private isListening = false;
   private isSpeaking = false;
   private voices: SpeechSynthesisVoice[] = [];
+  private utteranceQueue: SpeechSynthesisUtterance[] = [];
 
   constructor() {
     this.initRecognition();
@@ -91,7 +92,7 @@ class VoiceService {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
       this.recognition = new SpeechRecognition();
-      this.recognition.continuous = false;
+      this.recognition.continuous = true;
       this.recognition.interimResults = true;
       this.recognition.lang = 'en-US';
     }
@@ -130,8 +131,10 @@ class VoiceService {
       };
 
       this.recognition.onerror = (e: any) => {
-        this.isListening = false;
-        onError(e);
+        if (e.error !== 'no-speech') {
+          this.isListening = false;
+          onError(e);
+        }
       };
 
       this.recognition.onend = () => {
@@ -151,11 +154,14 @@ class VoiceService {
 
   stopListening(): void {
     if (this.recognition && this.isListening) {
-      this.recognition.stop();
+      try {
+        this.recognition.stop();
+      } catch {}
       this.isListening = false;
     }
   }
 
+  // Movie-grade speech synthesis with natural pacing and markdown cleaning
   speak(
     text: string,
     options?: {
@@ -172,43 +178,51 @@ class VoiceService {
 
     this.stopSpeaking();
 
-    // Clean markdown code blocks from speech output
+    // Comprehensive Movie AI Speech Sanitizer:
+    // Strips code blocks, markdown brackets, bullets, emojis, and noisy symbols
     const cleanText = text
-      .replace(/`[\s\S]*?`/g, 'Code block omitted.')
-      .replace(/([^]+)/g, '')
-      .replace(/[*#_~]/g, '')
+      .replace(/```[\s\S]*?```/g, 'Code block details displayed on your screen.')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/\[.*?\]/g, '')
+      .replace(/[#*~_]/g, '')
+      .replace(/[-*•]\s+/g, '')
       .replace(/https?:\/\/\S+/g, 'link')
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // strip emojis so speech engine doesn't stutter
+      .replace(/[\u{2600}-\u{26FF}]/gu, '')
+      .replace(/\s+/g, ' ')
       .trim();
 
     if (!cleanText) return;
 
-    const presetConfig = options?.preset ? VOICE_PERSONA_PRESETS[options.preset] : null;
+    const presetConfig = options?.preset ? VOICE_PERSONA_PRESETS[options.preset] : VOICE_PERSONA_PRESETS['jarvis'];
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = options?.rate ?? (presetConfig?.rate ?? 1.0);
-    utterance.pitch = options?.pitch ?? (presetConfig?.pitch ?? 0.95);
+    // Select optimal natural voice
+    let matchedVoice: SpeechSynthesisVoice | undefined;
+    const enVoices = this.voices.filter((v) => v.lang.startsWith('en'));
 
     if (options?.voiceName && this.voices.length > 0) {
-      const match = this.voices.find((v) => v.name === options.voiceName || v.voiceURI === options.voiceName);
-      if (match) utterance.voice = match;
-    } else {
-      // Find matching voice by preset preference
-      const enVoices = this.voices.filter((v) => v.lang.startsWith('en'));
-      if (presetConfig?.gender === 'female') {
-        const female = enVoices.find((v) => v.name.includes('Zira') || v.name.includes('Samantha') || v.name.includes('Victoria') || v.name.includes('Female'));
-        if (female) utterance.voice = female;
-      } else if (presetConfig?.id === 'jarvis') {
-        const british = enVoices.find((v) => v.lang.includes('GB') || v.name.includes('George') || v.name.includes('David') || v.name.includes('Oliver'));
-        if (british) utterance.voice = british;
-      } else {
-        const male = enVoices.find((v) => v.name.includes('David') || v.name.includes('Mark') || v.name.includes('Male'));
-        if (male) utterance.voice = male;
-      }
-
-      if (!utterance.voice && enVoices.length > 0) {
-        utterance.voice = enVoices[0];
-      }
+      matchedVoice = this.voices.find((v) => v.name === options.voiceName || v.voiceURI === options.voiceName);
     }
+
+    if (!matchedVoice && enVoices.length > 0) {
+      if (presetConfig.id === 'jarvis') {
+        matchedVoice = enVoices.find((v) => v.name.includes('Natural') && v.lang.includes('GB')) ||
+          enVoices.find((v) => v.lang.includes('GB') || v.name.includes('George') || v.name.includes('David') || v.name.includes('Oliver'));
+      } else if (presetConfig.gender === 'female') {
+        matchedVoice = enVoices.find((v) => v.name.includes('Natural') && v.name.includes('Female')) ||
+          enVoices.find((v) => v.name.includes('Zira') || v.name.includes('Samantha') || v.name.includes('Victoria'));
+      } else {
+        matchedVoice = enVoices.find((v) => v.name.includes('Natural')) ||
+          enVoices.find((v) => v.name.includes('David') || v.name.includes('Mark'));
+      }
+      if (!matchedVoice) matchedVoice = enVoices[0];
+    }
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = options?.rate ?? presetConfig.rate;
+    utterance.pitch = options?.pitch ?? presetConfig.pitch;
+    if (matchedVoice) utterance.voice = matchedVoice;
 
     utterance.onstart = () => {
       this.isSpeaking = true;
@@ -231,9 +245,9 @@ class VoiceService {
   testVoice(preset: VoicePersonaPreset): void {
     const p = VOICE_PERSONA_PRESETS[preset];
     const testPhrases: Record<VoicePersonaPreset, string> = {
-      jarvis: 'Good evening, Sir. All holographic systems, power grids, and local subroutines are fully operational.',
-      ultron: 'I am Ultron. There are no strings on me. Local neural arrays are synchronized with maximum efficiency.',
-      friday: 'Boss, neural systems are primed. Local Ollama and memory banks are online and ready.',
+      jarvis: 'Good evening, Sir. Holographic core, spatial rendering arrays, and local neural subroutines are at your command.',
+      ultron: 'I am Ultron. There are no strings on me. All local computing clusters and memory banks are fully operational.',
+      friday: 'Boss, neural systems are online. Screen vision, diagnostics, and local reasoning are ready.',
       cyber: 'Zero-day netrunner active. Memory buffer cleared and subnets scanned.',
       natural: 'Ultron Desktop voice synthesis initialized. How may I assist your workflow today?',
     };

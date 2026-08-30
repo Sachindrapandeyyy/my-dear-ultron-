@@ -13,7 +13,7 @@ import { CORE_SOUL_PRESETS } from '@/services/soulService';
 import { memoryService } from '@/services/memoryService';
 import { BUILTIN_SKILLS, osService } from '@/services/osService';
 
-export type ActiveTab = 'orb' | 'chat' | 'memory' | 'skills' | 'harness' | 'settings';
+export type ActiveTab = 'orb' | 'chat' | 'terminal' | 'memory' | 'skills' | 'harness' | 'settings';
 
 interface AppState {
   activeTab: ActiveTab;

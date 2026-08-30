@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppStore, ActiveTab } from '@/store/useAppStore';
 import { ORB_THEMES } from '@/lib/orb/theme';
 import {
@@ -100,6 +100,7 @@ export const HeaderHUD: React.FC = () => {
   const navItems: { id: ActiveTab; label: string; icon: any }[] = [
     { id: 'orb', label: 'ORB MATRIX', icon: Globe },
     { id: 'chat', label: 'NEURAL CHAT', icon: MessageSquare },
+    { id: 'terminal', label: 'TERMINAL', icon: Server },
     { id: 'memory', label: 'MEMORY HUB', icon: Database },
     { id: 'skills', label: 'SKILLS & OS', icon: Wrench },
     { id: 'harness', label: 'SOUL PRESETS', icon: Users },
