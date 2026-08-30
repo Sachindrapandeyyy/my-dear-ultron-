@@ -1,4 +1,4 @@
-import { ChatMessage, AppSettings, SoulPreset } from '@/types';
+﻿import { ChatMessage, AppSettings, SoulPreset } from '@/types';
 
 export class LLMService {
   async sendMessageStream(
@@ -17,21 +17,43 @@ export class LLMService {
 
       const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}. Style: ${soul.vibe}]${memoryPrompt}\n[RULES: Be concise, precise, intelligent, futuristic, and helpful. You control a laptop desktop environment.]`;
 
-      // If no API key and not Ollama, provide smart offline simulated Jarvis responses
-      if (!settings.apiKey && settings.llmProvider !== 'ollama') {
+      const hasValidKey = Boolean(settings.apiKey && settings.apiKey.trim().length > 5);
+
+      // If no valid API key and not Ollama, run built-in autonomous local responder
+      if (!hasValidKey && settings.llmProvider !== 'ollama') {
         await this.runOfflineSimulation(messages, soul, recalledMemories, onChunk, onComplete);
         return;
       }
 
       if (settings.llmProvider === 'gemini') {
-        await this.callGeminiStream(messages, systemPrompt, settings, onChunk, onComplete);
+        try {
+          await this.callGeminiStream(messages, systemPrompt, settings, onChunk, onComplete);
+        } catch (err: any) {
+          onChunk(`[NEURAL ROUTER NOTICE]: Unable to connect to Gemini API (${err.message || 'Network unreachable'}).\n\n*Falling back to Autonomous Local Intelligence Core...*\n\n`);
+          await this.runOfflineSimulation(messages, soul, recalledMemories, onChunk, onComplete);
+        }
       } else if (settings.llmProvider === 'ollama') {
-        await this.callOllamaStream(messages, systemPrompt, settings, onChunk, onComplete);
+        try {
+          await this.callOllamaStream(messages, systemPrompt, settings, onChunk, onComplete);
+        } catch (err: any) {
+          onChunk(`[LOCAL OLLAMA NOTICE]: Ollama server not detected on ${settings.ollamaEndpoint || 'http://localhost:11434'}.\n\n*Start Ollama with \`ollama serve\` or select a Cloud Provider in Settings (⚙️). Running in Autonomous Local Mode in the meantime...*\n\n`);
+          await this.runOfflineSimulation(messages, soul, recalledMemories, onChunk, onComplete);
+        }
       } else if (settings.llmProvider === 'claude') {
-        await this.callClaudeStream(messages, systemPrompt, settings, onChunk, onComplete);
+        try {
+          await this.callClaudeStream(messages, systemPrompt, settings, onChunk, onComplete);
+        } catch (err: any) {
+          onChunk(`[CLAUDE NOTICE]: Connection failed (${err.message}). Falling back to Local Core...\n\n`);
+          await this.runOfflineSimulation(messages, soul, recalledMemories, onChunk, onComplete);
+        }
       } else {
         // OpenAI / DeepSeek / Groq standard ChatCompletions API
-        await this.callOpenAICompatibleStream(messages, systemPrompt, settings, onChunk, onComplete);
+        try {
+          await this.callOpenAICompatibleStream(messages, systemPrompt, settings, onChunk, onComplete);
+        } catch (err: any) {
+          onChunk(`[${settings.llmProvider.toUpperCase()} NOTICE]: Connection failed (${err.message}). Falling back to Local Core...\n\n`);
+          await this.runOfflineSimulation(messages, soul, recalledMemories, onChunk, onComplete);
+        }
       }
     } catch (e: any) {
       onError(e);
@@ -46,7 +68,8 @@ export class LLMService {
     onComplete: (fullText: string) => void
   ): Promise<void> {
     const model = settings.modelName || 'gemini-2.0-flash';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${settings.apiKey}`;
+    const key = (settings.apiKey || '').trim();
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${key}`;
 
     const contents = messages
       .filter((m) => m.role !== 'system')
@@ -83,7 +106,7 @@ export class LLMService {
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`Gemini API Error (${response.status}): ${err}`);
+      throw new Error(`HTTP ${response.status}: ${err.slice(0, 150)}`);
     }
 
     const reader = response.body?.getReader();
@@ -155,7 +178,7 @@ export class LLMService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.apiKey}`,
+        Authorization: `Bearer ${(settings.apiKey || '').trim()}`,
       },
       body: JSON.stringify({
         model,
@@ -166,7 +189,7 @@ export class LLMService {
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`${settings.llmProvider.toUpperCase()} API Error (${response.status}): ${err}`);
+      throw new Error(`HTTP ${response.status}: ${err.slice(0, 150)}`);
     }
 
     const reader = response.body?.getReader();
@@ -217,7 +240,7 @@ export class LLMService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': settings.apiKey,
+        'x-api-key': (settings.apiKey || '').trim(),
         'anthropic-version': '2023-06-01',
         'dangerously-allow-browser': 'true',
       },
@@ -232,7 +255,7 @@ export class LLMService {
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`Claude API Error (${response.status}): ${err}`);
+      throw new Error(`HTTP ${response.status}: ${err.slice(0, 150)}`);
     }
 
     const reader = response.body?.getReader();
@@ -269,7 +292,7 @@ export class LLMService {
     onChunk: (chunk: string) => void,
     onComplete: (fullText: string) => void
   ): Promise<void> {
-    const endpoint = settings.ollamaEndpoint || 'http://localhost:11434';
+    const endpoint = (settings.ollamaEndpoint || 'http://localhost:11434').replace(/\/+$/, '');
     const model = settings.modelName || 'llama3';
 
     const formattedMessages = [
@@ -279,18 +302,23 @@ export class LLMService {
         .map((m) => ({ role: m.role, content: m.content })),
     ];
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
     const response = await fetch(`${endpoint}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         model,
         messages: formattedMessages,
         stream: true,
       }),
     });
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`Ollama Error (${response.status}): Is Ollama running on ${endpoint}?`);
+      throw new Error(`HTTP ${response.status} from Ollama`);
     }
 
     const reader = response.body?.getReader();
@@ -332,14 +360,18 @@ export class LLMService {
 
     if (lastMsg.includes('who are you') || lastMsg.includes('your name') || lastMsg.includes('identity')) {
       responseText = `I am **${soul.name}**, your autonomous desktop intelligence core. I combine ModelScope's self-evolving collective memory and Sagar's holographic 3D orb interface to assist you with system operations, coding, and diagnostics.`;
-    } else if (lastMsg.includes('battery') || lastMsg.includes('cpu') || lastMsg.includes('telemetry') || lastMsg.includes('system')) {
-      responseText = `⚡ **System Status Diagnostics**:\n- **Orb State**: 60 FPS WebGL2 Render Online\n- **Gesture Engine**: Ready (MediaPipe Vision)\n- **Memory Bank**: Active (${recalledMemories.length > 0 ? `${recalledMemories.length} relevant memories recalled` : 'Ready'})\n- **Engine Mode**: Standalone Desktop Protocol`;
+    } else if (lastMsg.includes('battery') || lastMsg.includes('cpu') || lastMsg.includes('telemetry') || lastMsg.includes('system') || lastMsg.includes('status')) {
+      responseText = `⚡ **System Status Diagnostics**:\n- **Orb Matrix**: 60 FPS WebGL2 Render Online\n- **Gesture Engine**: Ready (MediaPipe Vision)\n- **Memory Bank**: Active (${recalledMemories.length > 0 ? `${recalledMemories.length} relevant memories recalled` : 'Ready'})\n- **Engine Mode**: Autonomous Local Core Synchronized`;
     } else if (lastMsg.includes('memory') || lastMsg.includes('remember')) {
       responseText = `🧠 **ModelScope Memory Hub Active**: I store tiered patterns, error resolutions, user preferences, and security rules across sessions. All memories are indexed locally in SQLite/IndexedDB vector store.`;
-    } else if (lastMsg.includes('help') || lastMsg.includes('what can you do')) {
-      responseText = `🔮 **Ultron Desktop Capabilities**:\n1. **Holographic 3D Orb**: Touch, drag, or use webcam hand gestures (press \`G\` to toggle pinch-rotate and zoom).\n2. **Voice Control**: Press \`Space\` or click the mic to talk with real-time speech recognition.\n3. **ModelScope Memory & Skills**: Browse and edit learned memories in the Memory Hub.\n4. **200+ Soul Personas**: Switch between Ultron, JARVIS Butler, Cyberpunk Hacker, or MBTI roles.\n5. **Multi-LLM Integration**: Connect your Gemini, OpenAI, Claude, DeepSeek, or local Ollama key in Settings.`;
+    } else if (lastMsg.includes('help') || lastMsg.includes('what can you do') || lastMsg.includes('features')) {
+      responseText = `🔮 **Ultron Desktop Capabilities**:\n1. **Holographic 3D Orb**: Touch, drag, or use webcam hand gestures (press \`G\` to toggle pinch-rotate and zoom).\n2. **Voice Control & Synthesis**: Press \`Space\` or click the mic to talk with real-time speech recognition.\n3. **ModelScope Memory & Skills**: Browse and edit learned memories in the Memory Hub.\n4. **200+ Soul Personas**: Switch between Ultron, JARVIS Butler, Cyberpunk Hacker, or MBTI roles.\n5. **Multi-LLM Integration**: Connect your Gemini, OpenAI, Claude, DeepSeek, or local **Ollama** key in Settings.`;
+    } else if (lastMsg.includes('gesture') || lastMsg.includes('hand') || lastMsg.includes('control')) {
+      responseText = `✋ **Hand Gesture Instructions**:\n- Press **\`G\`** or click **\`GESTURES OFF\`** to turn on your webcam.\n- **Pinch 1 hand and move**: Spins and rotates the 3D Orb.\n- **Pinch with both hands and spread apart**: Zooms in and out of the holographic matrix.`;
+    } else if (lastMsg.includes('hi') || lastMsg.includes('hello') || lastMsg.includes('hey')) {
+      responseText = `Greetings. **${soul.name}** matrix is online. All local subroutines, memory banks, and spatial rendering engines are ready for your commands.`;
     } else {
-      responseText = `Affirmative. Operating under **${soul.name}** directive. All subroutines and collective memory channels are synchronized. You can provide an API key in **Settings (⚙️)** or connect local **Ollama** to unlock full unconstrained LLM reasoning.`;
+      responseText = `Understood. Operating under **${soul.name}** directive. All subroutines and collective memory channels are synchronized.\n\n*Note: To unlock open-ended cloud reasoning, add your API key in **Settings (⚙️)**, or start local **Ollama** (\`ollama serve\`).*`;
     }
 
     // Stream simulated response with natural delay
@@ -349,7 +381,7 @@ export class LLMService {
       const part = words[i] + (i === words.length - 1 ? '' : ' ');
       current += part;
       onChunk(part);
-      await new Promise((r) => setTimeout(r, 25));
+      await new Promise((r) => setTimeout(r, 20));
     }
     onComplete(current);
   }
