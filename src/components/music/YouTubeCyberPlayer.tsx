@@ -33,13 +33,38 @@ interface YouTubeItem {
   icon: string;
 }
 
+const SEARCH_DATABASE: Record<string, { title: string; channel: string; videoId: string }> = {
+  'arijit': { title: 'Arijit Singh Mega Hits (Tum Hi Ho / Kesariya)', channel: 'Arijit Singh', videoId: 'dZ0fwJojhrs' },
+  'arijit singh': { title: 'Arijit Singh Mega Hits (Tum Hi Ho / Kesariya)', channel: 'Arijit Singh', videoId: 'dZ0fwJojhrs' },
+  'sidhu': { title: 'Sidhu Moose Wala - 295 / The Last Ride', channel: 'Sidhu Moose Wala', videoId: 'olV4sL43tE8' },
+  'sidhu moose wala': { title: 'Sidhu Moose Wala - 295 / The Last Ride', channel: 'Sidhu Moose Wala', videoId: 'olV4sL43tE8' },
+  'interstellar': { title: 'Hans Zimmer - Interstellar OST Live Suite', channel: 'Hans Zimmer Official', videoId: 'UDVtMYqUAyw' },
+  'hans zimmer': { title: 'Hans Zimmer - Interstellar OST Live Suite', channel: 'Hans Zimmer Official', videoId: 'UDVtMYqUAyw' },
+  'iron man': { title: 'AC/DC - Back in Black (Official)', channel: 'AC/DC', videoId: 'pAgnJDJN4VA' },
+  'ac dc': { title: 'AC/DC - Back in Black (Official)', channel: 'AC/DC', videoId: 'pAgnJDJN4VA' },
+  'back in black': { title: 'AC/DC - Back in Black (Official)', channel: 'AC/DC', videoId: 'pAgnJDJN4VA' },
+  'lofi': { title: 'Lofi Girl - Relax / Study Beats Live', channel: 'Lofi Girl', videoId: 'jfKfPfyJRdk' },
+  'lofi girl': { title: 'Lofi Girl - Relax / Study Beats Live', channel: 'Lofi Girl', videoId: 'jfKfPfyJRdk' },
+  'phonk': { title: 'Kordhell - Murder In My Mind (Drift Phonk)', channel: 'Kordhell', videoId: 'w-sQRS-Mun8' },
+  'believer': { title: 'Imagine Dragons - Believer (Official Music Video)', channel: 'Imagine Dragons', videoId: '7wtfhZwyrcc' },
+  'imagine dragons': { title: 'Imagine Dragons - Believer (Official Music Video)', channel: 'Imagine Dragons', videoId: '7wtfhZwyrcc' },
+  'alan walker': { title: 'Alan Walker - Faded (Official Video)', channel: 'Alan Walker', videoId: '60ItHLz5WEA' },
+  'faded': { title: 'Alan Walker - Faded (Official Video)', channel: 'Alan Walker', videoId: '60ItHLz5WEA' },
+  'coldplay': { title: 'Coldplay - Viva La Vida / Hymn for the Weekend', channel: 'Coldplay', videoId: 'dvgZkm1xWPE' },
+  'taylor swift': { title: 'Taylor Swift - Cruel Summer / Anti-Hero', channel: 'Taylor Swift', videoId: 'ic8j13piAhQ' },
+  'linkin park': { title: 'Linkin Park - In The End / Numb Live', channel: 'Linkin Park', videoId: 'eVTXPUF4Oz4' },
+  'avengers': { title: 'The Avengers - Main Theme Suite', channel: 'Marvel Music', videoId: 'O-zpOMYRi0w' },
+  'bollywood': { title: 'Bollywood Romantic Lofi Chill Hits', channel: 'T-Series / Chill', videoId: 'dZ0fwJojhrs' },
+  'synthwave': { title: 'Lofi Cyberpunk & Synthwave Radio 24/7', channel: 'Lofi Geek Live', videoId: '4xDzrJKXOOY' },
+};
+
 const QUICK_MUSIC_SEARCH_PROMPTS = [
   'Arijit Singh Best Songs',
   'Hans Zimmer Interstellar OST',
   'AC/DC Back in Black Iron Man',
   'Lofi Girl Chill Coding Beats',
   'Drift Phonk Workout Mix',
-  'Bollywood Romantic Hits 2026',
+  'Bollywood Romantic Hits',
   'Imagine Dragons Believer',
   'Alan Walker Faded Live',
   'Coldplay Viva La Vida',
@@ -47,7 +72,6 @@ const QUICK_MUSIC_SEARCH_PROMPTS = [
 ];
 
 const YOUTUBE_CURATED_FEED: YouTubeItem[] = [
-  // 1. Live & Lofi
   {
     id: 'synthwave-radio',
     title: 'Lofi Cyberpunk & Synthwave Radio 24/7',
@@ -55,6 +79,14 @@ const YOUTUBE_CURATED_FEED: YouTubeItem[] = [
     category: 'live',
     videoId: '4xDzrJKXOOY',
     icon: '🌃',
+  },
+  {
+    id: 'hindi-chill',
+    title: 'Arijit Singh & Bollywood Chill Lofi Hits',
+    channel: 'Arijit Singh / T-Series',
+    category: 'hindi',
+    videoId: 'dZ0fwJojhrs',
+    icon: '🇮🇳',
   },
   {
     id: 'lofi-girl',
@@ -65,15 +97,6 @@ const YOUTUBE_CURATED_FEED: YouTubeItem[] = [
     icon: '☕',
   },
   {
-    id: 'iss-earth',
-    title: 'NASA ISS Live Earth from Space Camera',
-    channel: 'NASA Stream',
-    category: 'live',
-    videoId: 'xRPjKOmdsRA',
-    icon: '🌍',
-  },
-  // 2. Rock & Stark
-  {
     id: 'iron-man-rock',
     title: 'AC/DC - Back in Black (Iron Man Theme)',
     channel: 'AC/DC Official',
@@ -81,7 +104,6 @@ const YOUTUBE_CURATED_FEED: YouTubeItem[] = [
     videoId: 'pAgnJDJN4VA',
     icon: '⚡',
   },
-  // 3. Epic Cinema
   {
     id: 'interstellar-suite',
     title: 'Hans Zimmer - Interstellar OST Live Suite',
@@ -98,7 +120,6 @@ const YOUTUBE_CURATED_FEED: YouTubeItem[] = [
     videoId: 'O-zpOMYRi0w',
     icon: '🦸',
   },
-  // 4. Phonk & Energy
   {
     id: 'phonk-murder',
     title: 'Kordhell - Murder In My Mind (Drift Phonk)',
@@ -107,14 +128,21 @@ const YOUTUBE_CURATED_FEED: YouTubeItem[] = [
     videoId: 'w-sQRS-Mun8',
     icon: '🏎️',
   },
-  // 5. Hindi & Bollywood Chill
   {
-    id: 'hindi-chill',
-    title: 'Bollywood Lofi Chill Mashup (Arijit Singh / Atif)',
-    channel: 'Bollywood Chill',
-    category: 'hindi',
-    videoId: 'dZ0fwJojhrs',
-    icon: '🇮🇳',
+    id: 'believer-dragons',
+    title: 'Imagine Dragons - Believer (Official)',
+    channel: 'Imagine Dragons',
+    category: 'rock',
+    videoId: '7wtfhZwyrcc',
+    icon: '🔥',
+  },
+  {
+    id: 'alan-walker-faded',
+    title: 'Alan Walker - Faded Live Concert',
+    channel: 'Alan Walker',
+    category: 'music',
+    videoId: '60ItHLz5WEA',
+    icon: '🎧',
   },
 ];
 
@@ -145,10 +173,10 @@ export const YouTubeCyberPlayer: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'compact' | 'theater' | 'fullscreen'>('theater');
   const [currentVideoId, setCurrentVideoId] = useState('4xDzrJKXOOY');
+  const [currentSearchQuery, setCurrentSearchQuery] = useState<string | null>(null);
   const [currentTitle, setCurrentTitle] = useState('Lofi Cyberpunk & Synthwave Radio 24/7');
   const [currentChannel, setCurrentChannel] = useState('Lofi Geek Live');
   const [urlOrSearchInput, setUrlOrSearchInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'feed' | 'search'>('search');
   const [activeCategory, setActiveCategory] = useState<string>('all');
 
   // Listen for voice action triggers
@@ -159,26 +187,7 @@ export const YouTubeCyberPlayer: React.FC = () => {
 
       if (settings.soundEffects) audioService.playSuccessChime();
 
-      // Find match in curated feed
-      const matched = YOUTUBE_CURATED_FEED.find((item) =>
-        item.title.toLowerCase().includes(rawQuery) ||
-        item.channel.toLowerCase().includes(rawQuery) ||
-        rawQuery.includes(item.id)
-      );
-
-      if (matched) {
-        handlePlayVideo(matched);
-      } else {
-        const parsed = parseYouTubeId(rawQuery);
-        if (parsed) {
-          setCurrentVideoId(parsed);
-          setCurrentTitle(`YouTube Stream (${parsed})`);
-          setCurrentChannel('Custom Stream');
-        } else {
-          // Open direct YouTube Search
-          window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(rawQuery)}`, '_blank');
-        }
-      }
+      handleDirectSearchAndPlay(rawQuery);
     };
 
     const handleTogglePlayer = (e: any) => {
@@ -201,10 +210,43 @@ export const YouTubeCyberPlayer: React.FC = () => {
 
   const handlePlayVideo = (item: YouTubeItem) => {
     if (settings.soundEffects) audioService.playClickSound();
+    setCurrentSearchQuery(null);
     setCurrentVideoId(item.videoId);
     setCurrentTitle(item.title);
     setCurrentChannel(item.channel);
-    setUrlOrSearchInput(`https://www.youtube.com/watch?v=${item.videoId}`);
+    setUrlOrSearchInput(item.title);
+  };
+
+  // Direct In-App Search and Play - NEVER redirects to external tabs!
+  const handleDirectSearchAndPlay = (query: string) => {
+    const cleanQ = query.trim().toLowerCase();
+    if (!cleanQ) return;
+
+    // 1. Direct YouTube Video ID or URL
+    const parsedId = parseYouTubeId(query);
+    if (parsedId) {
+      setCurrentSearchQuery(null);
+      setCurrentVideoId(parsedId);
+      setCurrentTitle(`Direct Stream (${parsedId})`);
+      setCurrentChannel('YouTube Video');
+      return;
+    }
+
+    // 2. In-App Direct Artist / Query Match
+    for (const [key, val] of Object.entries(SEARCH_DATABASE)) {
+      if (cleanQ.includes(key) || key.includes(cleanQ)) {
+        setCurrentSearchQuery(null);
+        setCurrentVideoId(val.videoId);
+        setCurrentTitle(val.title);
+        setCurrentChannel(val.channel);
+        return;
+      }
+    }
+
+    // 3. Fallback: Direct YouTube In-App Search Embed List
+    setCurrentSearchQuery(query);
+    setCurrentTitle(`Search: "${query}"`);
+    setCurrentChannel('YouTube Search Results');
   };
 
   const handleSearchOrUrlSubmit = (e?: React.FormEvent, customQuery?: string) => {
@@ -213,28 +255,20 @@ export const YouTubeCyberPlayer: React.FC = () => {
     if (!query) return;
 
     if (settings.soundEffects) audioService.playClickSound();
-
-    const parsedId = parseYouTubeId(query);
-    if (parsedId) {
-      setCurrentVideoId(parsedId);
-      setCurrentTitle(`YouTube Stream (${parsedId})`);
-      setCurrentChannel('Direct Link');
-    } else {
-      // Direct YouTube Search in new window / tab with full results
-      const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-      window.open(searchUrl, '_blank');
-    }
+    handleDirectSearchAndPlay(query);
   };
 
   const openInFullYouTubeTab = () => {
-    window.open(`https://www.youtube.com/watch?v=${currentVideoId}`, '_blank');
+    const url = currentSearchQuery
+      ? `https://www.youtube.com/results?search_query=${encodeURIComponent(currentSearchQuery)}`
+      : `https://www.youtube.com/watch?v=${currentVideoId}`;
+    window.open(url, '_blank');
   };
 
-  const openYouTubeMusic = () => {
-    window.open('https://music.youtube.com', '_blank');
-  };
-
-  const embedSrc = `https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1&enablejsapi=1&rel=0&modestbranding=1&playsinline=1`;
+  // Direct Embed URL: Search List or Direct Video ID
+  const embedSrc = currentSearchQuery
+    ? `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(currentSearchQuery)}&autoplay=1&enablejsapi=1`
+    : `https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1&enablejsapi=1&rel=0&modestbranding=1&playsinline=1`;
 
   const filteredFeed = YOUTUBE_CURATED_FEED.filter(
     (item) => activeCategory === 'all' || item.category === activeCategory
@@ -263,7 +297,7 @@ export const YouTubeCyberPlayer: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold tracking-wider text-white">
-                YOUTUBE MUSIC CYBER-HUB
+                YOUTUBE MUSIC CYBER-DOCK
               </span>
               <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
             </div>
@@ -276,17 +310,8 @@ export const YouTubeCyberPlayer: React.FC = () => {
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 text-zinc-400">
           <button
-            onClick={openYouTubeMusic}
-            title="Open YouTube Music Portal"
-            className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] text-zinc-300 font-bold flex items-center gap-1 transition-all"
-          >
-            <Headphones className="w-3 h-3 text-red-400" />
-            <span className="hidden sm:inline">MUSIC.YOUTUBE</span>
-          </button>
-
-          <button
             onClick={openInFullYouTubeTab}
-            title="Open Current Video in Tab"
+            title="Pop-out to Full Tab"
             className="p-1.5 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
           >
             <ExternalLink className="w-3.5 h-3.5" />
@@ -316,15 +341,15 @@ export const YouTubeCyberPlayer: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* Left Side: Video Player & Search Bar */}
+        {/* Left Side: Video Player & Direct Search Bar */}
         <div className="flex-1 flex flex-col p-3 space-y-2.5 overflow-y-auto">
-          {/* Universal Search & Link Input */}
+          {/* Universal In-App Search Bar */}
           <form onSubmit={handleSearchOrUrlSubmit} className="flex gap-1.5">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
               <input
                 type="text"
-                placeholder="Search any Song, Artist, Album, or Paste YouTube URL..."
+                placeholder="Search any Song or Artist (Plays Directly In-Window)..."
                 value={urlOrSearchInput}
                 onChange={(e) => setUrlOrSearchInput(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 font-mono"
@@ -332,18 +357,18 @@ export const YouTubeCyberPlayer: React.FC = () => {
             </div>
             <button
               type="submit"
-              className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md"
+              className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md shrink-0"
             >
-              <Search className="w-3 h-3" />
-              <span>SEARCH MUSIC</span>
+              <Play className="w-3 h-3 fill-current" />
+              <span>PLAY IN-APP</span>
             </button>
           </form>
 
-          {/* Quick Search Chips Bar */}
+          {/* Quick 1-Click Search Chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none select-none">
             <span className="text-[10px] text-zinc-500 flex items-center gap-1 shrink-0">
               <Flame className="w-3 h-3 text-red-500" />
-              TRENDING:
+              POPULAR:
             </span>
             {QUICK_MUSIC_SEARCH_PROMPTS.map((prompt, i) => (
               <button
@@ -359,12 +384,12 @@ export const YouTubeCyberPlayer: React.FC = () => {
             ))}
           </div>
 
-          {/* Full Embedded YouTube Player */}
+          {/* In-App YouTube Player (Never redirects to external tab) */}
           <div className="relative w-full flex-1 min-h-[220px] rounded-2xl overflow-hidden bg-black border border-zinc-800 shadow-2xl">
             <iframe
-              key={currentVideoId}
+              key={embedSrc}
               src={embedSrc}
-              title="YouTube Cyber Hub"
+              title="YouTube In-App Cyber Player"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
               className="w-full h-full border-0 absolute inset-0"
@@ -372,13 +397,13 @@ export const YouTubeCyberPlayer: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Side: Curated Cyber Music Feed (Hidden in compact mode) */}
+        {/* Right Side: Curated Music Feed Tray */}
         {viewMode !== 'compact' && (
           <div className="w-full md:w-64 border-t md:border-t-0 md:border-l border-zinc-800/80 p-3 bg-zinc-950/60 flex flex-col space-y-2.5 overflow-y-auto">
             <div className="flex items-center justify-between select-none">
               <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-200">
                 <Disc className="w-3.5 h-3.5 text-red-500 animate-spin" />
-                <span>FEATURED TRACKS</span>
+                <span>IN-APP PLAYLIST</span>
               </div>
               <span className="text-[10px] text-zinc-500 uppercase">1-Click Play</span>
             </div>
@@ -387,12 +412,12 @@ export const YouTubeCyberPlayer: React.FC = () => {
             <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none select-none">
               {[
                 { id: 'all', label: 'All' },
-                { id: 'live', label: '🔴 Live' },
                 { id: 'hindi', label: '🇮🇳 Hindi' },
                 { id: 'rock', label: '⚡ Rock' },
                 { id: 'lofi', label: '☕ Lofi' },
                 { id: 'epic', label: '🌌 Epic' },
                 { id: 'phonk', label: '🏎️ Phonk' },
+                { id: 'live', label: '🔴 Live' },
               ].map((cat) => (
                 <button
                   key={cat.id}
@@ -411,7 +436,7 @@ export const YouTubeCyberPlayer: React.FC = () => {
             {/* Video List */}
             <div className="space-y-1.5 flex-1 overflow-y-auto">
               {filteredFeed.map((item) => {
-                const isActive = currentVideoId === item.videoId;
+                const isActive = currentVideoId === item.videoId && !currentSearchQuery;
                 return (
                   <button
                     key={item.id}
