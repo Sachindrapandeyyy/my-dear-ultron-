@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { securityService } from '@/services/securityService';
 import { audioService } from '@/services/audioService';
@@ -68,7 +68,7 @@ export const FaceEnrollModal: React.FC = () => {
   const handleSaveEnrollment = () => {
     if (!capturedSnapshot || !capturedFeatures.length) return;
 
-    securityService.enrollFace(userName, capturedSnapshot, pin, capturedFeatures);
+    securityService.enrollFace(userName, capturedSnapshot, capturedFeatures);
     if (settings.soundEffects) audioService.playSuccessChime();
 
     voiceService.speak(`Biometric Face ID registered successfully for ${userName}. Security protocol active.`, {

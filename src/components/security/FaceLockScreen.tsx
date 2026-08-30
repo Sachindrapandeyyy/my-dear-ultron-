@@ -1,32 +1,30 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { securityService, FaceDescriptor } from '@/services/securityService';
 import { audioService } from '@/services/audioService';
 import { voiceService } from '@/services/voiceService';
+import { JarvisOrb } from '@/components/orb/JarvisOrb';
 import {
-  ShieldAlert,
   ShieldCheck,
   Lock,
-  Unlock,
-  KeyRound,
   Camera,
-  AlertTriangle,
   UserCheck,
   Sparkles,
   Zap,
   Check,
-  X,
+  User,
+  Shield,
 } from 'lucide-react';
 
 export const FaceLockScreen: React.FC = () => {
-  const { setIsLocked, setIsEnrollModalOpen, settings } = useAppStore();
+  const { setIsLocked, settings, setTheme } = useAppStore();
 
   const [profile, setProfile] = useState<FaceDescriptor | null>(null);
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState(false);
-  const [scanStatus, setScanStatus] = useState<'scanning' | 'granted' | 'denied'>('scanning');
+  const [userNameInput, setUserNameInput] = useState('Sachindra Pandey');
+  const [scanStatus, setScanStatus] = useState<'scanning' | 'granted' | 'enrolling'>('scanning');
   const [matchScore, setMatchScore] = useState(0);
   const [cameraActive, setCameraActive] = useState(false);
+  const [isEnrolledJustNow, setIsEnrolledJustNow] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -36,6 +34,13 @@ export const FaceLockScreen: React.FC = () => {
   useEffect(() => {
     const prof = securityService.getEnrolledProfile();
     setProfile(prof);
+
+    if (!prof) {
+      setScanStatus('enrolling');
+    } else {
+      setScanStatus('scanning');
+    }
+
     startCamera();
 
     return () => {
@@ -67,9 +72,9 @@ export const FaceLockScreen: React.FC = () => {
     }
   };
 
-  // Continuous Face Scan Loop
+  // Continuous Biometric Face Scan Loop
   useEffect(() => {
-    if (!cameraActive || !profile) return;
+    if (!cameraActive || !profile || scanStatus === 'enrolling' || scanStatus === 'granted') return;
 
     intervalRef.current = setInterval(() => {
       if (!videoRef.current || videoRef.current.readyState < 2) return;
@@ -81,8 +86,8 @@ export const FaceLockScreen: React.FC = () => {
       const scorePct = Math.round(score * 100);
       setMatchScore(scorePct);
 
-      // Fast, reliable unlock threshold: >= 60%
-      if (score >= 0.60 && scanStatus !== 'granted') {
+      // Fast, reliable facial biometric unlock threshold: >= 58%
+      if (score >= 0.58) {
         consecutiveMatchesRef.current += 1;
         if (consecutiveMatchesRef.current >= 2) {
           handleAccessGranted();
@@ -90,7 +95,7 @@ export const FaceLockScreen: React.FC = () => {
       } else {
         consecutiveMatchesRef.current = 0;
       }
-    }, 400);
+    }, 350);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -99,63 +104,78 @@ export const FaceLockScreen: React.FC = () => {
 
   const handleAccessGranted = () => {
     setScanStatus('granted');
+    setTheme('matrix'); // Turn Orb to Emerald Matrix Green on unlock
+
     if (settings.soundEffects) audioService.playSuccessChime();
 
-    voiceService.speak(`Identity verified. Welcome back, ${profile?.userName || 'Sachindra'}.`, {
+    voiceService.speak(`Biometric identity confirmed. Welcome back, ${profile?.userName || 'Sachindra Pandey'}.`, {
       preset: 'jarvis',
     });
 
     setTimeout(() => {
       stopCamera();
       setIsLocked(false);
-    }, 800);
+    }, 1000);
   };
 
-  const handlePinSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (securityService.verifyPin(pinInput)) {
-      if (settings.soundEffects) audioService.playSuccessChime();
-      voiceService.speak('Access granted via security PIN.', { preset: 'jarvis' });
-      stopCamera();
-      setIsLocked(false);
-    } else {
-      setPinError(true);
-      if (settings.soundEffects) audioService.playWarningSiren();
-      setTimeout(() => setPinError(false), 2000);
-    }
-  };
+  const handleCaptureEnrollment = () => {
+    if (!videoRef.current) return;
+    const { features, snapshot } = securityService.extractFrameFeatures(videoRef.current);
+    if (!snapshot || !features.length) return;
 
-  const handleQuickBypass = () => {
-    if (settings.soundEffects) audioService.playClickSound();
-    stopCamera();
-    setIsLocked(false);
+    if (settings.soundEffects) audioService.playSuccessChime();
+
+    const newProfile = securityService.enrollFace(userNameInput, snapshot, features);
+    setProfile(newProfile);
+    setIsEnrolledJustNow(true);
+
+    voiceService.speak(`Face Password registered for ${userNameInput}. Biometric lock armed.`, {
+      preset: 'jarvis',
+    });
+
+    setTimeout(() => {
+      setIsEnrolledJustNow(false);
+      setScanStatus('scanning');
+    }, 1200);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 select-none font-mono bg-black/95 backdrop-blur-xl animate-fadeIn">
-      {/* Background Cyber Grid */}
-      <div className="absolute inset-0 bg-[radial-gradient(#1e1e24_1px,transparent_1px)] [background-size:16px_16px] opacity-30 pointer-events-none" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none font-mono bg-black overflow-hidden animate-fadeIn">
+      {/* 1. Live 3D Holographic Orb Rendering in the Lock Screen Background */}
+      <div className="absolute inset-0 opacity-40 pointer-events-none scale-110 blur-sm">
+        <JarvisOrb />
+      </div>
 
-      <div className="relative z-10 max-w-md w-full bg-zinc-950/95 border border-zinc-800 p-6 rounded-2xl shadow-2xl flex flex-col items-center text-center space-y-4">
-        {/* Top Security Badge */}
-        <div className="flex items-center gap-2">
-          {scanStatus === 'granted' ? (
-            <ShieldCheck className="w-8 h-8 text-emerald-400 animate-bounce" />
-          ) : (
-            <Lock className="w-8 h-8 text-cyan-400" />
-          )}
-          <div>
-            <h1 className="text-base font-bold tracking-[0.2em] text-white">
-              {scanStatus === 'granted' ? 'IDENTITY VERIFIED' : 'BIOMETRIC FACE ID BARRIER'}
+      {/* Background Cyber Grid */}
+      <div className="absolute inset-0 bg-[radial-gradient(#00f3ff_1px,transparent_1px)] [background-size:24px_24px] opacity-15 pointer-events-none" />
+
+      {/* Main Holographic Lock Glass Panel */}
+      <div className="relative z-20 max-w-lg w-full bg-zinc-950/90 border-2 border-cyan-500/60 p-6 md:p-8 rounded-3xl shadow-[0_0_50px_rgba(0,243,255,0.25)] backdrop-blur-2xl flex flex-col items-center text-center space-y-5">
+        {/* Top Security Emblem */}
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-2xl bg-cyan-950/80 border border-cyan-500/80 shadow-[0_0_15px_rgba(0,243,255,0.4)]">
+            {scanStatus === 'granted' ? (
+              <ShieldCheck className="w-8 h-8 text-emerald-400 animate-bounce" />
+            ) : (
+              <Shield className="w-8 h-8 text-cyan-400 animate-pulse" />
+            )}
+          </div>
+          <div className="text-left">
+            <h1 className="text-base md:text-lg font-bold tracking-[0.25em] text-white">
+              {scanStatus === 'granted'
+                ? 'ACCESS AUTHORIZED'
+                : scanStatus === 'enrolling'
+                ? 'INITIALIZE FACE PASSWORD'
+                : 'BIOMETRIC FACE ID BARRIER'}
             </h1>
-            <p className="text-[10px] text-zinc-400 uppercase tracking-widest">
-              Sachindra Pandey Security System
+            <p className="text-[10px] text-cyan-400 uppercase tracking-widest font-bold">
+              nxt IN Company • Sachindra Pandey Protocol
             </p>
           </div>
         </div>
 
         {/* Live Camera Scanner HUD */}
-        <div className="relative w-64 h-64 rounded-2xl overflow-hidden border-2 bg-black shadow-inner flex items-center justify-center border-zinc-800">
+        <div className="relative w-64 h-64 md:w-72 md:h-72 rounded-2xl overflow-hidden border-2 bg-black shadow-[inset_0_0_20px_rgba(0,0,0,0.9)] flex items-center justify-center border-cyan-500/80">
           <video
             ref={videoRef}
             playsInline
@@ -168,126 +188,124 @@ export const FaceLockScreen: React.FC = () => {
             {/* Target Brackets */}
             <div className="w-full flex justify-between">
               <div
-                className={`w-6 h-6 border-t-2 border-l-2 ${
-                  scanStatus === 'granted' ? 'border-emerald-400' : 'border-cyan-400'
+                className={`w-8 h-8 border-t-2 border-l-2 transition-all duration-300 ${
+                  scanStatus === 'granted' ? 'border-emerald-400 shadow-[0_0_10px_#34d399]' : 'border-cyan-400 shadow-[0_0_10px_#22d3ee]'
                 }`}
               />
               <div
-                className={`w-6 h-6 border-t-2 border-r-2 ${
-                  scanStatus === 'granted' ? 'border-emerald-400' : 'border-cyan-400'
+                className={`w-8 h-8 border-t-2 border-r-2 transition-all duration-300 ${
+                  scanStatus === 'granted' ? 'border-emerald-400 shadow-[0_0_10px_#34d399]' : 'border-cyan-400 shadow-[0_0_10px_#22d3ee]'
                 }`}
               />
             </div>
 
             {/* Scanning Laser Line */}
             {cameraActive && scanStatus !== 'granted' && (
-              <div className="w-full h-0.5 bg-cyan-400 shadow-[0_0_12px_#22d3ee] animate-pulse" />
+              <div className="w-full h-1 bg-cyan-400 shadow-[0_0_16px_#22d3ee] animate-pulse" />
             )}
 
-            {/* Target Oval */}
-            <div className="w-32 h-40 border border-dashed border-cyan-400/40 rounded-full flex items-center justify-center">
-              <span className="text-[9px] text-cyan-400/80 tracking-widest uppercase font-bold">
-                {profile ? (matchScore >= 60 ? 'MATCH VERIFIED' : 'ALIGN FACE') : 'NO ENROLLMENT'}
+            {/* Target Face Oval */}
+            <div
+              className={`w-36 h-48 border-2 border-dashed rounded-full flex flex-col items-center justify-center transition-all duration-300 ${
+                scanStatus === 'granted'
+                  ? 'border-emerald-400 shadow-[0_0_20px_#34d399] bg-emerald-950/20'
+                  : 'border-cyan-400/60 bg-cyan-950/10'
+              }`}
+            >
+              <span className="text-[10px] text-cyan-300 font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-black/60">
+                {scanStatus === 'granted'
+                  ? 'VERIFIED'
+                  : scanStatus === 'enrolling'
+                  ? 'ALIGN YOUR FACE'
+                  : matchScore >= 58
+                  ? 'MATCH DETECTED'
+                  : 'LOOK AT CAMERA'}
               </span>
             </div>
 
             <div className="w-full flex justify-between">
               <div
-                className={`w-6 h-6 border-b-2 border-l-2 ${
-                  scanStatus === 'granted' ? 'border-emerald-400' : 'border-cyan-400'
+                className={`w-8 h-8 border-b-2 border-l-2 transition-all duration-300 ${
+                  scanStatus === 'granted' ? 'border-emerald-400 shadow-[0_0_10px_#34d399]' : 'border-cyan-400 shadow-[0_0_10px_#22d3ee]'
                 }`}
               />
               <div
-                className={`w-6 h-6 border-b-2 border-r-2 ${
-                  scanStatus === 'granted' ? 'border-emerald-400' : 'border-cyan-400'
+                className={`w-8 h-8 border-b-2 border-r-2 transition-all duration-300 ${
+                  scanStatus === 'granted' ? 'border-emerald-400 shadow-[0_0_10px_#34d399]' : 'border-cyan-400 shadow-[0_0_10px_#22d3ee]'
                 }`}
               />
             </div>
           </div>
         </div>
 
-        {/* Biometric Status Feed */}
-        <div className="w-full space-y-2">
-          {profile ? (
-            <div className="p-2.5 rounded-lg bg-zinc-900/80 border border-zinc-800 text-xs flex items-center justify-between">
-              <span className="text-zinc-400">AUTHORIZED USER:</span>
-              <span className="text-emerald-400 font-bold">{profile.userName}</span>
+        {/* Mode 1: First-Time Face Enrollment Mode */}
+        {scanStatus === 'enrolling' && (
+          <div className="w-full space-y-3">
+            <div className="space-y-1 text-left">
+              <label className="text-[11px] text-zinc-400 font-bold">CREATOR / AUTHORIZED NAME:</label>
+              <div className="flex items-center gap-2 p-2 bg-zinc-900 border border-zinc-800 rounded-lg">
+                <User className="w-4 h-4 text-cyan-400" />
+                <input
+                  type="text"
+                  value={userNameInput}
+                  onChange={(e) => setUserNameInput(e.target.value)}
+                  placeholder="Sachindra Pandey"
+                  className="bg-transparent text-xs text-white focus:outline-none flex-1 font-mono font-bold"
+                />
+              </div>
             </div>
-          ) : (
-            <div className="p-3 bg-amber-950/40 border border-amber-800/60 rounded-lg text-xs text-amber-300 flex items-center justify-between">
-              <span>No Face ID profile enrolled yet.</span>
-              <button
-                onClick={() => setIsEnrollModalOpen(true)}
-                className="px-2 py-1 bg-amber-500 text-black font-bold rounded text-[10px]"
-              >
-                SETUP NOW
-              </button>
-            </div>
-          )}
 
-          {profile && (
-            <div className="space-y-1">
+            <button
+              onClick={handleCaptureEnrollment}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-black font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(0,243,255,0.4)] tracking-wider"
+            >
+              <Camera className="w-4 h-4" />
+              <span>CAPTURE & ENROLL FACE PASSWORD</span>
+            </button>
+          </div>
+        )}
+
+        {/* Mode 2: Real-time Scanning Feed */}
+        {scanStatus !== 'enrolling' && profile && (
+          <div className="w-full space-y-3">
+            <div className="p-3 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs flex items-center justify-between">
+              <span className="text-zinc-400">AUTHORIZED USER:</span>
+              <span className="text-cyan-400 font-bold">{profile.userName}</span>
+            </div>
+
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between text-[11px] text-zinc-400 px-1">
-                <span>FACIAL MATCH CONFIDENCE:</span>
-                <span className={`font-bold ${matchScore >= 60 ? 'text-emerald-400' : 'text-cyan-400'}`}>
+                <span>FACIAL RECOGNITION CONFIDENCE:</span>
+                <span
+                  className={`font-bold ${
+                    matchScore >= 58 ? 'text-emerald-400' : 'text-cyan-400'
+                  }`}
+                >
                   {matchScore}%
                 </span>
               </div>
-              <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
+              <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
                 <div
                   className={`h-full transition-all duration-300 ${
-                    matchScore >= 60 ? 'bg-emerald-400' : 'bg-cyan-400'
+                    matchScore >= 58 ? 'bg-emerald-400 shadow-[0_0_10px_#34d399]' : 'bg-cyan-400'
                   }`}
                   style={{ width: `${Math.min(100, matchScore)}%` }}
                 />
               </div>
             </div>
-          )}
-        </div>
 
-        {/* PIN Bypass Form */}
-        <form onSubmit={handlePinSubmit} className="w-full space-y-2 pt-2 border-t border-zinc-800">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <KeyRound className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="password"
-                maxLength={8}
-                value={pinInput}
-                onChange={(e) => setPinInput(e.target.value)}
-                placeholder="Enter PIN (Default: 1234)..."
-                className={`w-full pl-9 pr-3 py-2 bg-zinc-900 border rounded-lg text-xs text-white focus:outline-none ${
-                  pinError ? 'border-red-500 ring-1 ring-red-500' : 'border-zinc-700 focus:border-cyan-400'
-                }`}
-              />
+            {/* Re-enroll Face Button */}
+            <div className="pt-2">
+              <button
+                onClick={() => setScanStatus('enrolling')}
+                className="text-[11px] text-zinc-400 hover:text-cyan-300 flex items-center justify-center gap-1 mx-auto"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Re-Capture Face Password</span>
+              </button>
             </div>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-bold transition-colors"
-            >
-              UNLOCK
-            </button>
           </div>
-          {pinError && <p className="text-[10px] text-red-400 font-bold">Invalid PIN code. Try 1234.</p>}
-        </form>
-
-        {/* Bottom Actions */}
-        <div className="flex items-center justify-between w-full pt-1">
-          <button
-            onClick={() => setIsEnrollModalOpen(true)}
-            className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-bold"
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span>{profile ? 'Re-Enroll Face ID' : 'Enroll Face ID'}</span>
-          </button>
-
-          <button
-            onClick={handleQuickBypass}
-            className="text-[11px] text-zinc-400 hover:text-white px-2 py-1 rounded bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-all font-bold"
-          >
-            Instant Bypass ✕
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

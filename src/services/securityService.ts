@@ -3,7 +3,7 @@
   userName: string;
   faceEmbeddingHash: number[];
   faceSnapshotDataUrl: string;
-  securityPin: string;
+  securityPin?: string;
 }
 
 export interface IntruderLog {
@@ -30,13 +30,12 @@ class SecurityService {
   }
 
   // Save new Face ID profile
-  enrollFace(userName: string, faceSnapshot: string, pin: string, features: number[]): FaceDescriptor {
+  enrollFace(userName: string, faceSnapshot: string, features: number[]): FaceDescriptor {
     const profile: FaceDescriptor = {
       enrolledAt: new Date().toISOString(),
       userName: userName || 'Sachindra Pandey',
       faceEmbeddingHash: features,
       faceSnapshotDataUrl: faceSnapshot,
-      securityPin: pin || '1234',
     };
     localStorage.setItem(this.storageKey, JSON.stringify(profile));
     return profile;
@@ -47,14 +46,7 @@ class SecurityService {
     localStorage.removeItem(this.storageKey);
   }
 
-  // Verify PIN
-  verifyPin(pin: string): boolean {
-    const profile = this.getEnrolledProfile();
-    if (!profile) return pin === '0000' || pin === '1234' || pin === '1111';
-    return profile.securityPin === pin || pin === '1234' || pin === '0000';
-  }
-
-  // Extract 64-bin spatial luminance & color histogram from video frame
+  // Extract high-dimensional 128-bin spatial luminance & facial contrast descriptor
   extractFrameFeatures(videoEl: HTMLVideoElement): { features: number[]; snapshot: string } {
     try {
       const canvas = document.createElement('canvas');
@@ -67,19 +59,28 @@ class SecurityService {
       const imgData = ctx.getImageData(0, 0, 160, 160);
       const data = imgData.data;
 
-      // 64-bin feature vector
-      const bins = new Array(64).fill(0);
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
+      // 4x4 Spatial Grid with 8 luminance bins per quadrant = 128 feature vector
+      const bins = new Array(128).fill(0);
+      const blockSize = 40; // 160 / 4
 
-        const lum = Math.floor((r * 0.299 + g * 0.587 + b * 0.114) / 4); // 0..63
-        const binIdx = Math.min(63, Math.max(0, lum));
-        bins[binIdx] += 1;
+      for (let y = 0; y < 160; y++) {
+        const blockY = Math.min(3, Math.floor(y / blockSize));
+        for (let x = 0; x < 160; x++) {
+          const blockX = Math.min(3, Math.floor(x / blockSize));
+          const gridIndex = blockY * 4 + blockX; // 0..15
+
+          const idx = (y * 160 + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+
+          const lum = Math.floor((r * 0.299 + g * 0.587 + b * 0.114) / 32); // 0..7
+          const binIdx = gridIndex * 8 + Math.min(7, Math.max(0, lum));
+          bins[binIdx] += 1;
+        }
       }
 
-      // Normalize L2
+      // L2 Normalization
       let sumSq = 0;
       for (let i = 0; i < bins.length; i++) {
         sumSq += bins[i] * bins[i];
@@ -87,14 +88,14 @@ class SecurityService {
       const norm = Math.sqrt(sumSq) || 1;
       const normalized = bins.map((b) => b / norm);
 
-      const snapshot = canvas.toDataURL('image/jpeg', 0.7);
+      const snapshot = canvas.toDataURL('image/jpeg', 0.8);
       return { features: normalized, snapshot };
     } catch {
       return { features: [], snapshot: '' };
     }
   }
 
-  // Calculate Cosine similarity between current frame and enrolled face profile
+  // Calculate Cosine Similarity
   calculateFaceMatch(currentFeatures: number[], enrolledFeatures: number[]): number {
     if (!currentFeatures.length || !enrolledFeatures.length) return 0;
     let dot = 0;
