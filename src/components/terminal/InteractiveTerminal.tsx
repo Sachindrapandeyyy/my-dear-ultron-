@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { ORB_THEMES } from '@/lib/orb/theme';
 import { Terminal as TerminalIcon, Play, Trash2, Shield, Zap, Sparkles, Cpu, Server } from 'lucide-react';
@@ -8,6 +8,7 @@ import { voiceService } from '@/services/voiceService';
 import { memoryService } from '@/services/memoryService';
 import { ollamaService } from '@/services/ollamaService';
 import { soulService } from '@/services/soulService';
+import { liveApiService } from '@/services/liveApiService';
 import { OrbTheme } from '@/types';
 
 interface TerminalLine {
@@ -182,6 +183,46 @@ export const InteractiveTerminal: React.FC = () => {
         } else {
           addLine('error', `[SCREEN VISION]: Capture cancelled by user.`);
         }
+        break;
+
+      case 'weather':
+        const city = rest || 'Delhi';
+        addLine('system', `Fetching real-time weather telemetry for ${city}...`);
+        const weatherData = await liveApiService.getWeather(city);
+        addLine('output', weatherData);
+        break;
+
+      case 'news':
+      case 'headlines':
+        addLine('system', 'Scanning real-time global tech radar and news feeds...');
+        const newsData = await liveApiService.getLiveNews();
+        addLine('output', newsData);
+        break;
+
+      case 'crypto':
+      case 'market':
+      case 'btc':
+        addLine('system', 'Querying live crypto market tickers (CoinGecko API)...');
+        const cryptoData = await liveApiService.getCryptoRates();
+        addLine('output', cryptoData);
+        break;
+
+      case 'music':
+      case 'play':
+        const song = rest || 'Hans Zimmer Interstellar';
+        window.dispatchEvent(new CustomEvent('ultron-play-youtube', { detail: { query: song } }));
+        addLine('success', `[YOUTUBE CYBER-DOCK]: Streaming "${song}" in background player.`);
+        break;
+
+      case 'lock':
+        useAppStore.getState().setIsLocked(true);
+        addLine('success', '[SECURITY]: Biometric Face ID barrier engaged.');
+        break;
+
+      case 'sentry':
+        const curSentry = useAppStore.getState().isSentryActive;
+        useAppStore.getState().setIsSentryActive(!curSentry);
+        addLine('success', `[SECURITY]: Sentry Surveillance Guard ${!curSentry ? 'ACTIVATED' : 'DEACTIVATED'}.`);
         break;
 
       case 'exit':
