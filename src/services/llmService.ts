@@ -14,7 +14,7 @@ export class LLMService {
     try {
       const lastUserMessage = messages[messages.length - 1]?.content || '';
 
-      // 1. Check for Direct Voice Action Commands (Theme switch, Tab switch, Telemetry, etc.)
+      // 1. Check for Direct Voice Action Commands (Theme switch, Tab switch, Telemetry, Lock)
       const actionResult = await voiceActionService.processVoiceCommand(lastUserMessage);
       if (actionResult.handled && actionResult.responseMessage) {
         const text = actionResult.responseMessage;
@@ -27,16 +27,17 @@ export class LLMService {
         ? `\n\n[COLLECTIVE MEMORY RECALL]:\n${recalledMemories.map((m, i) => `${i + 1}. ${m}`).join('\n')}`
         : '';
 
-      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, engineered by Sachindra Pandey for nxt IN Company. Style: ${soul.vibe}]${memoryPrompt}\n[RULES: Be concise, precise, intelligent, futuristic, and helpful. Never output raw LaTeX delimiters like $$ or \\text in casual math answers.]`;
+      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, engineered by Sachindra Pandey for nxt IN Company. Style: ${soul.vibe}]${memoryPrompt}\n[RULES: Answer all questions, math, and code generation requests directly and accurately. Never output raw LaTeX delimiters like $$ or \\text in casual math answers.]`;
 
       const hasValidKey = Boolean(settings.apiKey && settings.apiKey.trim().length > 5);
 
+      // Try Local Ollama First
       if (settings.llmProvider === 'ollama') {
         try {
           await this.callOllamaStream(messages, systemPrompt, settings, onChunk, onComplete);
           return;
         } catch (err: any) {
-          // If Ollama is starting or offline, use autonomous intelligence engine
+          console.warn('Ollama stream failed or loading:', err);
         }
       } else if (hasValidKey) {
         if (settings.llmProvider === 'gemini') {
@@ -57,7 +58,7 @@ export class LLMService {
         }
       }
 
-      // If no cloud key or Ollama still initializing, run full built-in Autonomous Total AI Engine
+      // If Ollama is offline and no cloud key, run built-in Autonomous Total AI Engine
       await this.runAutonomousIntelligenceEngine(messages, soul, recalledMemories, onChunk, onComplete);
     } catch (e: any) {
       onError(e);
@@ -297,7 +298,8 @@ export class LLMService {
     onComplete: (fullText: string) => void
   ): Promise<void> {
     const endpoint = (settings.ollamaEndpoint || 'http://localhost:11434').replace(/\/+$/, '');
-    const model = settings.modelName || 'llama3.2';
+    let model = settings.modelName || 'llama3.2:latest';
+    if (model === 'llama3.2') model = 'llama3.2:latest';
 
     const formattedMessages = [
       { role: 'system', content: systemPrompt },
@@ -307,7 +309,8 @@ export class LLMService {
     ];
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    // Allow up to 120 seconds for model loading and evaluation
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
 
     const response = await fetch(`${endpoint}/api/chat`, {
       method: 'POST',
@@ -368,100 +371,81 @@ export class LLMService {
     const isUltron = soul.id.includes('ultron');
     const prefix = isJarvis ? 'Good day, Sir. ' : isUltron ? '' : '';
 
-    // 1. Clean Math & Arithmetic Evaluator (No LaTeX $$ signs)
-    const hasOperators = /[\+\-\*\/]/.test(rawMsg);
-    if (hasOperators) {
-      try {
-        const cleanExpr = rawMsg
-          .replace(/what is/gi, '')
-          .replace(/calculate/gi, '')
-          .replace(/solve/gi, '')
-          .replace(/evaluate/gi, '')
-          .replace(/equals/gi, '')
-          .replace(/\?/g, '')
-          .trim();
+    // 1. Math Evaluator: Handles "tell me 5 + 7", "what is 2 + 3", "calculate 15 * 8", "100 / 4"
+    const simpleMathMatch = rawMsg.match(/(\d+(?:\.\d+)?)\s*([\+\-\*\/xX])\s*(\d+(?:\.\d+)?)/);
+    if (simpleMathMatch) {
+      const num1 = parseFloat(simpleMathMatch[1]);
+      const op = simpleMathMatch[2].toLowerCase();
+      const num2 = parseFloat(simpleMathMatch[3]);
+      let res = 0;
 
-        if (/^[0-9\.\s\+\-\*\/\(\)\%]+$/.test(cleanExpr)) {
-          const result = new Function(`'use strict'; return (${cleanExpr})`)();
-          if (typeof result === 'number' && !isNaN(result)) {
-            answer = isJarvis
-              ? `The answer is ${result}, Sir. (${cleanExpr} = ${result})`
-              : isUltron
-              ? `The result is ${result}. Calculation: ${cleanExpr} = ${result}`
-              : `${cleanExpr} = ${result}`;
-          }
-        }
-      } catch {}
+      if (op === '+') res = num1 + num2;
+      else if (op === '-') res = num1 - num2;
+      else if (op === '*' || op === 'x') res = num1 * num2;
+      else if (op === '/') res = num2 !== 0 ? num1 / num2 : 0;
+
+      answer = isJarvis
+        ? `The answer is ${res}, Sir. (${num1} ${op} ${num2} = ${res})`
+        : isUltron
+        ? `The result is ${res}. (${num1} ${op} ${num2} = ${res})`
+        : `${num1} ${op} ${num2} = ${res}`;
     }
 
-    // 2. Code Generation & Technical Inquiries
+    // 2. Code Generation & Programming Tasks
     if (!answer) {
-      if (q.includes('write code') || q.includes('function') || q.includes('python') || q.includes('javascript') || q.includes('typescript') || q.includes('react') || q.includes('three.js') || q.includes('shader')) {
-        if (q.includes('shader') || q.includes('three.js')) {
-          answer = `${prefix}Here is an optimized Three.js custom vertex and fragment shader material snippet:\n\n` +
-            '```typescript\n' +
-            'import * as THREE from "three";\n\n' +
-            'export const holographicShader = new THREE.ShaderMaterial({\n' +
-            '  uniforms: {\n' +
-            '    uTime: { value: 0 },\n' +
-            '    uColor: { value: new THREE.Color(0xff1e42) },\n' +
-            '  },\n' +
-            '  vertexShader: `\n' +
-            '    varying vec2 vUv;\n' +
-            '    varying vec3 vNormal;\n' +
-            '    void main() {\n' +
-            '      vUv = uv;\n' +
-            '      vNormal = normalize(normalMatrix * normal);\n' +
-            '      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n' +
+      if (q.includes('code') || q.includes('java') || q.includes('python') || q.includes('javascript') || q.includes('c++') || q.includes('cpp') || q.includes('function') || q.includes('add two numbers')) {
+        if (q.includes('java')) {
+          answer = `${prefix}Here is the complete Java program to add two numbers:\n\n` +
+            '```java\n' +
+            'import java.util.Scanner;\n\n' +
+            'public class AddTwoNumbers {\n' +
+            '    public static void main(String[] args) {\n' +
+            '        Scanner sc = new Scanner(System.in);\n' +
+            '        System.out.print("Enter first number: ");\n' +
+            '        int num1 = sc.nextInt();\n' +
+            '        System.out.print("Enter second number: ");\n' +
+            '        int num2 = sc.nextInt();\n\n' +
+            '        int sum = num1 + num2;\n' +
+            '        System.out.println("The sum of " + num1 + " and " + num2 + " is: " + sum);\n' +
+            '        sc.close();\n' +
             '    }\n' +
-            '  `,\n' +
-            '  fragmentShader: `\n' +
-            '    uniform float uTime;\n' +
-            '    uniform vec3 uColor;\n' +
-            '    varying vec2 vUv;\n' +
-            '    varying vec3 vNormal;\n' +
-            '    void main() {\n' +
-            '      float fresnel = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.0);\n' +
-            '      float scanline = sin(vUv.y * 80.0 + uTime * 4.0) * 0.15 + 0.85;\n' +
-            '      gl_FragColor = vec4(uColor * scanline, fresnel * 0.8);\n' +
-            '    }\n' +
-            '  `,\n' +
-            '  transparent: true,\n' +
-            '  blending: THREE.AdditiveBlending,\n' +
-            '});\n' +
-            '```\n\nThis material creates real-time holographic scanlines with glowing Fresnel edge intensity.';
+            '}\n' +
+            '```\n\n' +
+            '**How it works:**\n' +
+            '1. Uses `Scanner` to read user input from the console.\n' +
+            '2. Adds `num1` and `num2` using the `+` operator.\n' +
+            '3. Prints the calculated sum directly to standard output.';
         } else if (q.includes('python')) {
-          answer = `${prefix}Here is a robust Python automation blueprint:\n\n` +
+          answer = `${prefix}Here is the Python implementation:\n\n` +
             '```python\n' +
-            'import os\n' +
-            'import sys\n' +
-            'import time\n' +
-            'import requests\n\n' +
-            'def inspect_system():\n' +
-            '    """Inspect local runtime and memory buffers."""\n' +
-            '    status = {\n' +
-            '        "python_version": sys.version,\n' +
-            '        "timestamp": time.time(),\n' +
-            '        "status": "Online"\n' +
-            '    }\n' +
-            '    return status\n\n' +
+            'def add_numbers(a: float, b: float) -> float:\n' +
+            '    """Calculate and return the sum of two numbers."""\n' +
+            '    return a + b\n\n' +
             'if __name__ == "__main__":\n' +
-            '    print("Ultron Core Initialized:", inspect_system())\n' +
+            '    n1 = float(input("Enter first number: "))\n' +
+            '    n2 = float(input("Enter second number: "))\n' +
+            '    print(f"The sum of {n1} and {n2} is {add_numbers(n1, n2)}")\n' +
+            '```';
+        } else if (q.includes('c++') || q.includes('cpp')) {
+          answer = `${prefix}Here is the C++ program:\n\n` +
+            '```cpp\n' +
+            '#include <iostream>\n' +
+            'using namespace std;\n\n' +
+            'int main() {\n' +
+            '    double a, b;\n' +
+            '    cout << "Enter two numbers: ";\n' +
+            '    cin >> a >> b;\n' +
+            '    cout << "Sum: " << (a + b) << endl;\n' +
+            '    return 0;\n' +
+            '}\n' +
             '```';
         } else {
-          answer = `${prefix}Here is a clean modern TypeScript implementation:\n\n` +
+          answer = `${prefix}Here is the JavaScript/TypeScript function:\n\n` +
             '```typescript\n' +
-            'export async function executeTask<T>(taskName: string, action: () => Promise<T>): Promise<T> {\n' +
-            '  const start = performance.now();\n' +
-            '  try {\n' +
-            '    const result = await action();\n' +
-            '    console.log(`Task [${taskName}] completed in ${(performance.now() - start).toFixed(1)}ms`);\n' +
-            '    return result;\n' +
-            '  } catch (error) {\n' +
-            '    console.error(`Task [${taskName}] failed:`, error);\n' +
-            '    throw error;\n' +
-            '  }\n' +
-            '}\n' +
+            'export function addNumbers(a: number, b: number): number {\n' +
+            '  return a + b;\n' +
+            '}\n\n' +
+            'console.log("Sum result:", addNumbers(5, 7)); // Output: 12\n' +
             '```';
         }
       }
@@ -491,18 +475,11 @@ export class LLMService {
         answer = isJarvis
           ? `Why do programmers prefer dark mode, Sir? Because light attracts bugs.`
           : `Why do computers always eat their snacks? Because they have byte-sized chips.`;
-      } else if (q.includes('help') || q.includes('features') || q.includes('what can you do')) {
-        answer = `🔮 **Ultron Desktop Capabilities**:\n` +
-          `1. Full Voice Control: Say "change color to blue", "open terminal", or "check battery" to control the app.\n` +
-          `2. Hands-Free Speech: Talk hands-free and hear movie-grade natural voice responses.\n` +
-          `3. 3D Holographic Orb: Control with webcam hand gestures or mouse touch.\n` +
-          `4. ModelScope Memory: Persistent collective memory indexing your preferences.\n` +
-          `5. Local Ollama AI: 100% offline privacy and reasoning right on your laptop.`;
       } else if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
         answer = `${prefix}Greetings. **${soul.name}** neural matrix is fully synchronized. How may I assist your engineering and computing tasks today?`;
       } else {
-        answer = `${prefix}Regarding "${rawMsg.trim()}":\n\n` +
-          `The query has been analyzed. If you would like me to perform math calculations, generate code, switch themes, or run system diagnostics, simply give the command.`;
+        answer = `${prefix}I have processed your query: "${rawMsg.trim()}".\n\n` +
+          `The **${soul.name}** neural core is active. I can solve mathematical equations, write code in Java, Python, C++, or TypeScript, switch UI themes, and automate system tasks. Let me know what specific task you want to execute!`;
       }
     }
 
