@@ -229,6 +229,10 @@ class VoiceActionService {
         setTheme('void');
         return { handled: true, responseMessage: 'Orb color changed to Void Violet.' };
       }
+      if (raw.includes('pink') || raw.includes('rose') || raw.includes('magenta') || raw.includes('sakura')) {
+        setTheme('pink');
+        return { handled: true, responseMessage: 'Orb color changed to Cyberpunk Neon Pink.' };
+      }
     }
 
     // 9. Navigation & UI Tab Switching by Voice

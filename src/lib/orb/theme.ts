@@ -66,4 +66,17 @@ export const ORB_THEMES: Record<OrbTheme, ThemeColors> = {
     cssGlow: 'rgba(191, 85, 236, 0.65)',
     badge: 'border-purple-500/40 text-purple-400 bg-purple-950/40',
   },
+  pink: {
+    name: 'CYBERPUNK NEON PINK',
+    id: 'pink',
+    bright: 0xff1493,
+    mid: 0xff2a8d,
+    dim: 0xc71585,
+    faint: 0x4a0033,
+    hot: 0xff80bf,
+    cssPrimary: '#ff1493',
+    cssSecondary: '#ff2a8d',
+    cssGlow: 'rgba(255, 20, 147, 0.75)',
+    badge: 'border-pink-500/40 text-pink-400 bg-pink-950/40',
+  },
 };

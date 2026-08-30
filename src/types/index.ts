@@ -1,4 +1,4 @@
-export type OrbTheme = 'ultron' | 'jarvis' | 'arc' | 'matrix' | 'void';
+export type OrbTheme = 'ultron' | 'jarvis' | 'arc' | 'matrix' | 'void' | 'pink';
 
 export interface ThemeColors {
   name: string;
