@@ -1,4 +1,4 @@
-﻿import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store/useAppStore';
 import { OrbTheme } from '@/types';
 import { soulService } from '@/services/soulService';
 import { osService } from '@/services/osService';
@@ -18,21 +18,38 @@ class VoiceActionService {
     const raw = input.trim().toLowerCase();
     const { setTheme, setActiveTab, setActiveSoul, clearMessages, telemetry } = useAppStore.getState();
 
-    // 0. YouTube Music & Video Playback
-    if (raw.startsWith('play ') && (raw.includes(' on youtube') || raw.includes(' in youtube') || raw.includes('music') || raw.includes('song') || raw.includes('track') || raw.includes('theme') || raw.includes('beat'))) {
-      const cleanTrack = raw
+    // 0. Universal YouTube Music & Video Playback
+    const isPlayMusic =
+      raw.startsWith('play ') ||
+      raw.startsWith('play song ') ||
+      raw.startsWith('play track ') ||
+      raw.startsWith('gana bajao ') ||
+      raw.startsWith('gana lagao ') ||
+      raw.startsWith('song lagao ') ||
+      raw.startsWith('stream ');
+
+    if (isPlayMusic) {
+      let query = raw
+        .replace(/^play\s+song\s+/i, '')
+        .replace(/^play\s+track\s+/i, '')
         .replace(/^play\s+/i, '')
+        .replace(/^gana\s+bajao\s+/i, '')
+        .replace(/^gana\s+lagao\s+/i, '')
+        .replace(/^song\s+lagao\s+/i, '')
+        .replace(/^stream\s+/i, '')
         .replace(/\s+on\s+youtube/i, '')
         .replace(/\s+in\s+youtube/i, '')
         .trim();
-      const query = cleanTrack || 'Synthwave Cyberpunk mix';
+
+      if (!query || query === 'music' || query === 'song') query = 'Arijit Singh Hits';
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ultron-play-youtube', { detail: { query } }));
+        window.dispatchEvent(new CustomEvent('ultron-toggle-music-player', { detail: { state: 'open' } }));
       }
       return {
         handled: true,
-        responseMessage: `Initiating YouTube Cyber-Player. Streaming "${query}" in high fidelity audio matrix.`,
+        responseMessage: `Initiating YouTube Cyber-Player. Streaming "${query}" directly in your workspace.`,
       };
     }
 
@@ -43,7 +60,7 @@ class VoiceActionService {
       return { handled: true, responseMessage: 'Opening YouTube Cyber-Player Dock.' };
     }
 
-    if (raw.includes('close music') || raw.includes('stop music') || raw.includes('hide music')) {
+    if (raw.includes('close music') || raw.includes('stop music') || raw.includes('hide music') || raw.includes('pause music')) {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ultron-toggle-music-player', { detail: { state: 'close' } }));
       }
@@ -219,9 +236,13 @@ class VoiceActionService {
     }
 
     // 9. Navigation & UI Tab Switching by Voice
-    if (raw.includes('open terminal') || raw.includes('show terminal') || raw.includes('go to terminal')) {
+    if (raw.includes('open swarm') || raw.includes('show swarm') || raw.includes('go to swarm') || raw.includes('subagents') || raw.includes('multi agent') || raw.includes('swarm hub')) {
+      setActiveTab('swarm');
+      return { handled: true, responseMessage: 'Accessing Autonomous AI Subagent Swarm Mission Control.' };
+    }
+    if (raw.includes('open terminal') || raw.includes('show terminal') || raw.includes('go to terminal') || raw.includes('code runner') || raw.includes('python runner')) {
       setActiveTab('terminal');
-      return { handled: true, responseMessage: 'Opening Interactive OS Terminal.' };
+      return { handled: true, responseMessage: 'Opening Interactive OS Terminal & Code Sandbox.' };
     }
     if (raw.includes('open chat') || raw.includes('show chat') || raw.includes('go to chat')) {
       setActiveTab('chat');
@@ -231,9 +252,9 @@ class VoiceActionService {
       setActiveTab('orb');
       return { handled: true, responseMessage: 'Switching to 3D Holographic Viewport.' };
     }
-    if (raw.includes('open memory') || raw.includes('show memory') || raw.includes('go to memory') || raw.includes('memory hub')) {
+    if (raw.includes('open memory') || raw.includes('show memory') || raw.includes('go to memory') || raw.includes('memory hub') || raw.includes('mind map') || raw.includes('neural graph')) {
       setActiveTab('memory');
-      return { handled: true, responseMessage: 'Accessing ModelScope Memory Hub.' };
+      return { handled: true, responseMessage: 'Accessing ModelScope 3D Neural Memory Hub.' };
     }
     if (raw.includes('open settings') || raw.includes('show settings') || raw.includes('configure settings')) {
       setActiveTab('settings');

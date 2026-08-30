@@ -1,10 +1,11 @@
-﻿import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { ORB_THEMES } from '@/lib/orb/theme';
 import { voiceService } from '@/services/voiceService';
 import { audioService } from '@/services/audioService';
 import { llmService } from '@/services/llmService';
 import { memoryService } from '@/services/memoryService';
+import { voiceActionService } from '@/services/voiceActionService';
 import { Mic, MicOff, Volume2, Sparkles, Radio, Zap, VolumeX } from 'lucide-react';
 
 export const HandsFreeVoiceController: React.FC = () => {
@@ -186,6 +187,38 @@ export const HandsFreeVoiceController: React.FC = () => {
     addMessage(newMsg);
     setLiveTranscript('');
 
+    // 1. Check Voice Action Service (Immediate OS, UI & Music directives)
+    const actionResult = await voiceActionService.processVoiceCommand(query);
+    if (actionResult.handled) {
+      const respText = actionResult.responseMessage || 'Directive executed.';
+      const asstMsgId = `voice-asst-${Date.now()}`;
+      addMessage({
+        id: asstMsgId,
+        role: 'assistant',
+        content: respText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+
+      setWakeState('speaking');
+      setAgentState('speaking');
+
+      voiceService.speak(respText, {
+        rate: settings.voiceSpeed,
+        pitch: settings.voicePitch,
+        voiceName: settings.selectedVoice,
+        onEnd: () => {
+          setWakeState('idle');
+          setAgentState('idle');
+        },
+        onError: () => {
+          setWakeState('idle');
+          setAgentState('idle');
+        },
+      });
+      return;
+    }
+
+    // 2. Full LLM Reasoning
     const recalled = memoryService.recallRelevant(query);
     const asstMsgId = `voice-asst-${Date.now()}`;
     addMessage({

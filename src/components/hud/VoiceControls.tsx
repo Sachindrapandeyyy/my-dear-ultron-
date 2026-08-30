@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { ORB_THEMES } from '@/lib/orb/theme';
 import { Mic, MicOff, Volume2, ScreenShare, Sparkles } from 'lucide-react';
@@ -7,6 +7,7 @@ import { audioService } from '@/services/audioService';
 import { osService } from '@/services/osService';
 import { llmService } from '@/services/llmService';
 import { memoryService } from '@/services/memoryService';
+import { voiceActionService } from '@/services/voiceActionService';
 
 export const VoiceControls: React.FC = () => {
   const {
@@ -27,11 +28,14 @@ export const VoiceControls: React.FC = () => {
   } = useAppStore();
 
   const themeConfig = ORB_THEMES[theme];
+  const [liveTranscript, setLiveTranscript] = useState('');
+  const silenceTimerRef = useRef<any>(null);
 
   // Process voice input and trigger AI response
   const handleVoiceInput = useCallback(
     async (spokenText: string) => {
-      if (!spokenText.trim()) return;
+      const cleanText = spokenText.trim();
+      if (!cleanText) return;
 
       if (settings.soundEffects) audioService.playClickSound();
 
@@ -40,17 +44,54 @@ export const VoiceControls: React.FC = () => {
       addMessage({
         id: userMsgId,
         role: 'user',
-        content: spokenText,
+        content: cleanText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
 
       // 2. Set Agent Thinking State
       setAgentState('thinking');
+      setLiveTranscript('');
 
-      // 3. Recall Relevant Memories
-      const recalled = memoryService.recallRelevant(spokenText);
+      // 3. First check if this is an immediate UI / OS / Music Voice Command
+      const actionResult = await voiceActionService.processVoiceCommand(cleanText);
+      if (actionResult.handled) {
+        const respText = actionResult.responseMessage || 'Subroutine executed.';
+        const assistantMsgId = `asst-${Date.now()}`;
+        addMessage({
+          id: assistantMsgId,
+          role: 'assistant',
+          content: respText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        });
 
-      // 4. Create Empty Assistant Message
+        setAgentState('speaking');
+        setIsVoiceSpeaking(true);
+
+        if (settings.autoReadResponses) {
+          voiceService.speak(respText, {
+            rate: settings.voiceSpeed,
+            pitch: settings.voicePitch,
+            voiceName: settings.selectedVoice,
+            onEnd: () => {
+              setAgentState('idle');
+              setIsVoiceSpeaking(false);
+            },
+            onError: () => {
+              setAgentState('idle');
+              setIsVoiceSpeaking(false);
+            },
+          });
+        } else {
+          setAgentState('idle');
+          setIsVoiceSpeaking(false);
+        }
+        return;
+      }
+
+      // 4. Recall Relevant Memories for LLM Conversation
+      const recalled = memoryService.recallRelevant(cleanText);
+
+      // 5. Create Empty Assistant Message
       const assistantMsgId = `asst-${Date.now()}`;
       addMessage({
         id: assistantMsgId,
@@ -60,8 +101,8 @@ export const VoiceControls: React.FC = () => {
         recalledMemories: recalled,
       });
 
-      // 5. Stream LLM Response
-      const history = [...messages, { id: userMsgId, role: 'user' as const, content: spokenText, timestamp: '' }];
+      // 6. Stream LLM Response
+      const history = [...messages, { id: userMsgId, role: 'user' as const, content: cleanText, timestamp: '' }];
 
       let accumulated = '';
       await llmService.sendMessageStream(
@@ -107,19 +148,35 @@ export const VoiceControls: React.FC = () => {
 
   const toggleVoice = useCallback(() => {
     if (isVoiceListening) {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       voiceService.stopListening();
       audioService.stopMicAnalysis();
       setIsVoiceListening(false);
+      setLiveTranscript('');
       setAgentState('idle');
     } else {
       if (settings.soundEffects) audioService.playBootSound();
       voiceService.stopSpeaking();
       setIsVoiceSpeaking(false);
+      setLiveTranscript('');
 
       const ok = voiceService.startListening(
         (text, isFinal) => {
+          setLiveTranscript(text);
+          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
           if (isFinal) {
             handleVoiceInput(text);
+            voiceService.stopListening();
+            audioService.stopMicAnalysis();
+            setIsVoiceListening(false);
+          } else if (text.trim().length > 3) {
+            silenceTimerRef.current = setTimeout(() => {
+              handleVoiceInput(text);
+              voiceService.stopListening();
+              audioService.stopMicAnalysis();
+              setIsVoiceListening(false);
+            }, 1400);
           }
         },
         (err) => {
@@ -210,7 +267,20 @@ export const VoiceControls: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 select-none">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 select-none">
+      {/* Live Spoken Speech Preview Tooltip */}
+      {isVoiceListening && (
+        <div className="px-4 py-2 rounded-2xl bg-zinc-950/95 border-2 border-cyan-500/80 shadow-[0_0_20px_rgba(0,243,255,0.4)] backdrop-blur-xl max-w-md text-center animate-fadeIn">
+          <span className="text-[10px] text-cyan-400 font-bold tracking-widest block uppercase">
+            🎙️ LISTENING TO YOUR VOICE:
+          </span>
+          <span className="text-xs text-white font-mono">
+            {liveTranscript ? `"${liveTranscript}"` : 'Speak your command or question...'}
+          </span>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3">
       {/* Screen Vision Quick Button */}
       <button
         type="button"
@@ -272,6 +342,7 @@ export const VoiceControls: React.FC = () => {
             ? 'SPEAKING...'
             : 'READY'}
         </span>
+      </div>
       </div>
     </div>
   );

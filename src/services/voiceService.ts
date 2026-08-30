@@ -1,4 +1,4 @@
-﻿export interface VoiceOption {
+export interface VoiceOption {
   name: string;
   lang: string;
   voiceURI: string;
@@ -102,15 +102,27 @@ class VoiceService {
     onError: (err: any) => void,
     onEnd: () => void
   ): boolean {
-    if (!this.recognition) {
-      this.initRecognition();
-      if (!this.recognition) {
+    if (typeof window === 'undefined') return false;
+
+    try {
+      // Abort any prior instance to prevent InvalidStateError
+      if (this.recognition) {
+        try {
+          this.recognition.abort();
+        } catch {}
+      }
+
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) {
         onError(new Error('Speech recognition not supported in this browser/environment'));
         return false;
       }
-    }
 
-    try {
+      this.recognition = new SpeechRecognition();
+      this.recognition.continuous = true;
+      this.recognition.interimResults = true;
+      this.recognition.lang = 'en-US';
+
       this.recognition.onresult = (event: any) => {
         let interim = '';
         let final = '';
@@ -130,7 +142,7 @@ class VoiceService {
       };
 
       this.recognition.onerror = (e: any) => {
-        if (e.error !== 'no-speech') {
+        if (e.error !== 'no-speech' && e.error !== 'aborted') {
           this.isListening = false;
           onError(e);
         }
@@ -152,9 +164,10 @@ class VoiceService {
   }
 
   stopListening(): void {
-    if (this.recognition && this.isListening) {
+    if (this.recognition) {
       try {
         this.recognition.stop();
+        this.recognition.abort();
       } catch {}
       this.isListening = false;
     }
