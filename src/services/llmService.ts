@@ -58,7 +58,9 @@ export class LLMService {
         ? `\n\n[COLLECTIVE MEMORY RECALL]:\n${recalledMemories.map((m, i) => `${i + 1}. ${m}`).join('\n')}`
         : '';
 
-      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, engineered by Sachindra Pandey for nxt IN Company. Style: ${soul.vibe}]${memoryPrompt}${liveContextPrompt}\n[RULES: Answer all questions, live weather queries, news summaries, and code requests directly, accurately, and conversationally. Never say you cannot access live data when the live API data is provided in your context.]`;
+      const languageDirective = this.detectLanguageDirective(lastUserMessage);
+
+      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, engineered exclusively by Sachindra Pandey for nxt IN Company. User's full name is Sachindra Shekhar Pandey.]${memoryPrompt}${liveContextPrompt}${languageDirective}\n[RULES: Answer all questions, live weather queries, news summaries, and code requests directly, accurately, and conversationally. Never say you cannot access live data when the live API data is provided in your context. Never ask the user to dictate text when they ask to write in Hindi or provide their name.]`;
 
       const hasValidKey = Boolean(settings.apiKey && settings.apiKey.trim().length > 5);
 
@@ -404,6 +406,59 @@ export class LLMService {
     onComplete(accumulated);
   }
 
+  private detectLanguageDirective(userMessage: string): string {
+    const raw = userMessage.trim();
+    const q = raw.toLowerCase();
+
+    // 1. Devanagari Hindi Detection
+    const hasDevanagari = /[\u0900-\u097F]/.test(raw);
+    const explicitlyRequestsPureHindi =
+      q.includes('hindi me likho') ||
+      q.includes('hindi mein likho') ||
+      q.includes('hindi me translate') ||
+      q.includes('hindi me bolo') ||
+      q.includes('hindi me baat karo') ||
+      q.includes('hindi mein baat karo') ||
+      q.includes('write in hindi') ||
+      q.includes('in hindi language') ||
+      q.includes('tumhe ye hindi me likhna tha') ||
+      q.includes('tumhen yah hindi mein likhna tha') ||
+      q.includes('ise hindi mein likho') ||
+      q.includes('ise hindi me likho');
+
+    if (hasDevanagari || explicitlyRequestsPureHindi) {
+      return `\n\n[CRITICAL LANGUAGE MANDATE - DEVANAGARI HINDI (हिन्दी)]:
+- The user is speaking in Hindi or wants a response in Hindi.
+- You MUST formulate your response in pure, natural, fluent Devanagari Hindi (हिन्दी लिपि).
+- Do NOT reply in English.
+- Do NOT ask the user to "dictate the text". Answer their question, acknowledge their identity (सचिंद्र शेखर पाण्डेय), or write the requested text directly in Devanagari Hindi.
+- Respectful tone: "नमस्ते सचिंद्र जी! मैं आपका सहायक AI उल्ट्रॉन हूँ..."`;
+    }
+
+    // 2. Hinglish Detection (Hindi in Roman script)
+    const hinglishKeywords = [
+      'kya', 'hai', 'ho', 'kaise', 'kaisa', 'kaisi', 'tum', 'aap', 'naam', 'mera', 'meri', 'mere',
+      'mujhse', 'mujhe', 'hum', 'bhai', 'yaar', 'batao', 'karo', 'karna', 'karenge', 'karoge', 'rahe',
+      'raha', 'rahi', 'hain', 'hun', 'hoon', 'theek', 'thik', 'badhiya', 'kaun', 'kahan', 'kyun',
+      'kyu', 'nahi', 'nahin', 'mat', 'aur', 'toh', 'bhi', 'pe', 'par', 'se', 'ko', 'mein', 'me', 'yeh',
+      'ye', 'woh', 'wo', 'sab', 'kuch', 'bolo', 'suno', 'likho', 'likhna', 'chal', 'chalo', 'batayein'
+    ];
+
+    const words = q.split(/\s+/).map((w) => w.replace(/[^a-z]/g, ''));
+    const hinglishMatchCount = words.filter((w) => hinglishKeywords.includes(w)).length;
+    const isHinglish = hinglishMatchCount >= 2 || (words.length <= 4 && hinglishMatchCount >= 1);
+
+    if (isHinglish) {
+      return `\n\n[CRITICAL LANGUAGE MANDATE - NATURAL HINGLISH]:
+- The user is conversing in Hinglish (Hindi written in Roman/English alphabet).
+- You MUST formulate your entire response in natural, fluent, brotherly and respectful Hinglish.
+- Do NOT reply in formal English.
+- Do NOT ask the user to "dictate text". Answer directly in Hinglish (e.g. "Main badhiya hu Sachindra bhai! Aapka naam Sachindra Shekhar Pandey hai. Bataiye aaj kya banayein?").`;
+    }
+
+    return `\n\n[LANGUAGE: Respond naturally in the language matching the user's query.]`;
+  }
+
   // Autonomous Total AI Reasoning & Knowledge Engine (Fallback when offline)
   private async runAutonomousIntelligenceEngine(
     messages: ChatMessage[],
@@ -416,22 +471,48 @@ export class LLMService {
     const rawMsg = messages[messages.length - 1]?.content || '';
     const lastMsgObj = messages[messages.length - 1];
     const q = rawMsg.trim().toLowerCase();
+    const hasDevanagari = /[\u0900-\u097F]/.test(rawMsg);
+    const hasHindiRequest = q.includes('hindi') || q.includes('namaste') || hasDevanagari;
+    const hasHinglish = q.includes('kya') || q.includes('hai') || q.includes('tum') || q.includes('kaise') || q.includes('naam') || q.includes('mera') || q.includes('bhai') || q.includes('yaar');
+
     let answer = '';
 
-    const isJarvis = soul.id.includes('jarvis');
-    const isUltron = soul.id.includes('ultron');
-    const prefix = isJarvis ? 'Good day, Sir. ' : isUltron ? '' : '';
-
     if (liveContextPrompt) {
-      answer = `${prefix}Here is the real-time live data you requested:\n\n${liveContextPrompt.replace(/\[REAL-TIME.*?\]:\s*/g, '').trim()}`;
+      answer = `Here is the real-time live data you requested:\n\n${liveContextPrompt.replace(/\[REAL-TIME.*?\]:\s*/g, '').trim()}`;
     }
 
     // Handle Screen Vision
     if (!answer && lastMsgObj?.imageUrl) {
-      answer = `${prefix}I have inspected your desktop screen capture.\n\n` +
-        `• **Screen Status**: Active window frame captured and processed.\n` +
-        `• **Visual Diagnostics**: Interface layout, active browser tabs, and desktop workspace are operational.\n` +
-        `• **Action**: If you need me to debug code or summarize visible text on your screen, specify your target directive.`;
+      answer = hasHindiRequest || hasHinglish
+        ? `Maine aapki screen capture analyze kar li hai Sachindra bhai! Saari windows aur layout nominal hai. Bataiye kya specific debug karna hai?`
+        : `I have inspected your desktop screen capture. Active window frame and desktop workspace are operational. Specify your target directive.`;
+    }
+
+    // Name / Identity / Creator response
+    if (!answer && (q.includes('sachindra') || q.includes('mera naam') || q.includes('naam kya') || q.includes('kya naam'))) {
+      if (hasDevanagari || q.includes('hindi mein likho') || q.includes('hindi me likho')) {
+        answer = `नमस्ते सचिंद्र जी! आपका पूरा नाम सचिंद्र शेखर पाण्डेय (Sachindra Shekhar Pandey) है। आप nxt IN Company के संस्थापक और मेरे निर्माता हैं।`;
+      } else if (hasHinglish) {
+        answer = `Aapka naam Sachindra Shekhar Pandey hai, aur aap nxt IN Company ke creator aur mere engineer hain! Main Ultron Sovereign hu, bataiye Sachindra bhai aaj kya build karein?`;
+      }
+    }
+
+    // "tum kaise ho" / "kaise hain aap"
+    if (!answer && (q.includes('kaise ho') || q.includes('kaise hain') || q.includes('kaisa hai'))) {
+      if (hasDevanagari) {
+        answer = `नमस्ते सचिंद्र जी! मैं उल्ट्रॉन सोवरेन बिल्कुल उत्तम और सक्रिय हूँ। सभी न्यूरल मॉडल्स और सबएजेंट्स तैयार हैं। आप कैसे हैं?`;
+      } else if (hasHinglish) {
+        answer = `Main ekdum badhiya aur energized hu Sachindra bhai! Saare neural channels aur 3D matrix 60 FPS par active hain. Aap bataiye aaj ka kya mission hai?`;
+      }
+    }
+
+    // "hindi me bolo" / "hindi me baat karo"
+    if (!answer && (q.includes('hindi me baat karo') || q.includes('hindi mein baat karo') || q.includes('hindi me bolo') || q.includes('hindi mein'))) {
+      if (hasDevanagari) {
+        answer = `जी सचिंद्र जी! अब से मैं आपसे शुद्ध और सहज हिन्दी में बात करूँगा। आज हम क्या नया प्रोजेक्ट बना रहे हैं?`;
+      } else {
+        answer = `Haan bilkul Sachindra bhai! Ab se hum Hinglish aur Hindi me hi baat karenge. Bataiye kya hukum hai?`;
+      }
     }
 
     // Math Evaluator
@@ -448,16 +529,22 @@ export class LLMService {
         else if (op === '*' || op === 'x') res = num1 * num2;
         else if (op === '/') res = num2 !== 0 ? num1 / num2 : 0;
 
-        answer = isJarvis
-          ? `The answer is ${res}, Sir. (${num1} ${op} ${num2} = ${res})`
-          : isUltron
-          ? `The result is ${res}. (${num1} ${op} ${num2} = ${res})`
-          : `${num1} ${op} ${num2} = ${res}`;
+        answer = hasDevanagari
+          ? `इसका उत्तर ${res} है, सचिंद्र जी। (${num1} ${op} ${num2} = ${res})`
+          : hasHinglish
+          ? `Iska answer ${res} hai Sachindra bhai! (${num1} ${op} ${num2} = ${res})`
+          : `The result is ${res}. (${num1} ${op} ${num2} = ${res})`;
       }
     }
 
     if (!answer) {
-      answer = `${prefix}I have analyzed your query: "${rawMsg.trim()}". The neural matrix is online and ready for calculations, code generation, diagnostics, and system automation.`;
+      if (hasDevanagari) {
+        answer = `नमस्ते सचिंद्र जी! मैंने आपका संदेश प्राप्त कर लिया है: "${rawMsg.trim()}"। उल्ट्रॉन न्यूरल मैट्रिक्स सक्रिय है और कोडिंग, डायग्नोस्टिक्स व सिस्टम ऑटोमेशन के लिए तैयार है।`;
+      } else if (hasHinglish) {
+        answer = `Haan Sachindra bhai! Maine aapka message process kar liya hai: "${rawMsg.trim()}". Ultron neural matrix ready hai, bataiye kya code ya automation execute karein?`;
+      } else {
+        answer = `I have analyzed your query: "${rawMsg.trim()}". The neural matrix is online and ready for calculations, code generation, diagnostics, and system automation.`;
+      }
     }
 
     const words = answer.split(' ');
