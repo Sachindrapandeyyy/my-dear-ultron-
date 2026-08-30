@@ -167,21 +167,38 @@ class MemoryService {
   }
 
   search(query: string): MemoryItem[] {
-    if (!query.trim()) return this.getAll();
-    const q = query.toLowerCase();
+    const raw = query.trim().toLowerCase();
+    if (!raw || raw.length < 3) return [];
+
+    // Skip greetings from triggering false memory recall
+    const greetings = ['hi', 'hello', 'hey', 'kaise', 'kaisa', 'namaste', 'how are', 'who are'];
+    if (greetings.some((g) => raw === g || raw.startsWith(`${g} `))) {
+      return [];
+    }
+
+    const queryWords = raw.split(/\s+/).filter((w) => w.length >= 3);
+    if (queryWords.length === 0) return [];
+
     return this.memories
       .map((m) => {
         let score = 0;
-        if (m.title.toLowerCase().includes(q)) score += 5;
-        if (m.content.toLowerCase().includes(q)) score += 3;
-        if (m.tags.some((t) => t.toLowerCase().includes(q))) score += 4;
+        const titleLower = m.title.toLowerCase();
+        const contentLower = m.content.toLowerCase();
+
+        for (const word of queryWords) {
+          const wordRegex = new RegExp(`\\b${word}\\b`, 'i');
+          if (wordRegex.test(titleLower)) score += 6;
+          if (wordRegex.test(contentLower)) score += 3;
+          if (m.tags.some((t) => wordRegex.test(t.toLowerCase()))) score += 5;
+        }
+
         return { ...m, score };
       })
       .filter((m) => (m.score || 0) > 0)
       .sort((a, b) => (b.score || 0) - (a.score || 0));
   }
 
-  recallRelevant(query: string, maxResults = 3): string[] {
+  recallRelevant(query: string, maxResults = 2): string[] {
     const results = this.search(query).slice(0, maxResults);
     results.forEach((r) => this.incrementHit(r.id));
     return results.map((r) => `[${r.category.toUpperCase()}] ${r.title}: ${r.content}`);
