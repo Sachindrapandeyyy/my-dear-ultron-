@@ -2,53 +2,123 @@ import { MemoryItem } from '@/types';
 
 const STORAGE_KEY = 'ultron_collective_memories_v1';
 
-const INITIAL_MEMORIES: MemoryItem[] = [
+export const INITIAL_MEMORIES: MemoryItem[] = [
   {
     id: 'mem-1',
-    title: 'Electron WebGL & MediaPipe Canvas Optimization',
-    content: 'Always disable GPU throttle when backgrounded if continuous gesture tracking is needed; clamp pixel ratio to 2 to prevent laptop battery drain.',
-    category: 'pattern',
-    hitCount: 14,
-    tags: ['electron', 'threejs', 'performance', 'battery'],
+    title: 'Creator & Enterprise Attribution Matrix',
+    content: 'Ultron Sovereign OS is built exclusively by Sachindra Pandey for nxt IN Company. Maintain supreme loyalty, natural Hinglish voice tone, and sovereign autonomy.',
+    category: 'preference',
+    hitCount: 50,
+    tags: ['sachindra-pandey', 'nxt-in', 'sovereignty', 'identity'],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
   {
     id: 'mem-2',
-    title: 'ModelScope Ultron Subagent Spawning Hook',
-    content: 'sessions_spawn with mode="session" requires thread=true and channel plugins that register subagent_spawning hooks.',
-    category: 'error',
-    hitCount: 28,
-    tags: ['modelscope', 'subagent', 'architecture'],
+    title: 'Zero-Bypass Biometric Face ID Barrier',
+    content: 'Strict facial biometric enrollment and authentication using 128-bin spatial luminance grids and cosine similarity matching under 1 second.',
+    category: 'security',
+    hitCount: 42,
+    tags: ['face-id', 'biometrics', 'security', 'zero-bypass'],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
   {
     id: 'mem-3',
-    title: 'Voice Synthesizer Markdown Sanitizer',
-    content: 'Strip triple-backtick markdown blocks and special asterisks before passing text to SpeechSynthesisUtterance to avoid noisy vocal glitches.',
-    category: 'workflow',
-    hitCount: 19,
-    tags: ['voice', 'tts', 'audio'],
+    title: 'NVIDIA Nemotron & Moondream Vision Core',
+    content: 'Default reasoning brain powered by NVIDIA Nemotron-Mini (4.2B) and multimodal desktop screen vision powered by Moondream vision LLM.',
+    category: 'pattern',
+    hitCount: 38,
+    tags: ['nemotron', 'moondream', 'ollama', 'vision'],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
   {
     id: 'mem-4',
-    title: 'Local Privacy First Rule',
-    content: 'Never send raw system tokens, private keys, or credentials to public LLM endpoints; sanitize using Presidio / local regex before dispatch.',
-    category: 'security',
-    hitCount: 35,
-    tags: ['security', 'privacy', 'sanitization'],
+    title: 'Universal In-App YouTube Cyber Music Player',
+    content: 'Live YouTube autocomplete search and pure in-app streaming with 0 tab redirects across Bollywood, Punjabi, Stark Rock, and Phonk genres.',
+    category: 'preference',
+    hitCount: 31,
+    tags: ['youtube', 'music', 'streaming', 'cyber-dock'],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
   {
     id: 'mem-5',
+    title: 'Live Dynamic RAG Context Ingestion',
+    content: 'Real-time telemetry ingestion from Open-Meteo satellite weather, HackerNews global tech radar, and CoinGecko cryptocurrency tickers.',
+    category: 'workflow',
+    hitCount: 29,
+    tags: ['rag', 'weather', 'news', 'crypto', 'live-api'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'mem-6',
+    title: 'Autonomous AI Subagent Swarm Architecture',
+    content: 'Multi-agent mission control spawning Veritas Researcher, Daedalus Architect, Aegis Sentinel, and Oracle Analyst in parallel with live thought streams.',
+    category: 'pattern',
+    hitCount: 27,
+    tags: ['swarm', 'subagents', 'multi-agent', 'parallel'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'mem-7',
+    title: 'Full-Duplex Hands-Free Voice Engine',
+    content: 'Ambient wake word detection for "Hey Ultron" and "Jarvis" with natural interruption cancellation and auto-voice activity detection (VAD).',
+    category: 'workflow',
+    hitCount: 24,
+    tags: ['voice', 'wake-word', 'vad', 'full-duplex'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'mem-8',
+    title: 'Electron WebGL & MediaPipe Canvas Optimization',
+    content: 'Always disable GPU throttle when backgrounded if continuous gesture tracking is needed; clamp pixel ratio to 2 to prevent laptop battery drain.',
+    category: 'pattern',
+    hitCount: 21,
+    tags: ['electron', 'threejs', 'performance', 'battery'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'mem-9',
+    title: 'ModelScope Ultron Subagent Spawning Hook',
+    content: 'sessions_spawn with mode="session" requires thread=true and channel plugins that register subagent_spawning hooks.',
+    category: 'error',
+    hitCount: 20,
+    tags: ['modelscope', 'subagent', 'architecture'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'mem-10',
+    title: 'Voice Synthesizer Markdown Sanitizer',
+    content: 'Strip triple-backtick markdown blocks, code brackets, and LaTeX delimiters before passing text to SpeechSynthesisUtterance.',
+    category: 'workflow',
+    hitCount: 18,
+    tags: ['voice', 'tts', 'sanitizer', 'audio'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'mem-11',
+    title: 'Local Privacy First Directive',
+    content: 'Never send raw system tokens, private keys, or credentials to public LLM endpoints; sanitize using Presidio / local regex before dispatch.',
+    category: 'security',
+    hitCount: 16,
+    tags: ['security', 'privacy', 'sanitization'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'mem-12',
     title: 'Laptop Energy Conservation Protocol',
     content: 'When user is idle for > 60 seconds, scale Three.js render loop down from 60 FPS to 20 FPS to maximize laptop battery life.',
     category: 'preference',
-    hitCount: 9,
+    hitCount: 12,
     tags: ['energy', 'battery', 'optimization'],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -66,11 +136,14 @@ class MemoryService {
     try {
       const data = localStorage.getItem(STORAGE_KEY);
       if (data) {
-        this.memories = JSON.parse(data);
-      } else {
-        this.memories = [...INITIAL_MEMORIES];
-        this.save();
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this.memories = parsed;
+          return;
+        }
       }
+      this.memories = [...INITIAL_MEMORIES];
+      this.save();
     } catch {
       this.memories = [...INITIAL_MEMORIES];
     }

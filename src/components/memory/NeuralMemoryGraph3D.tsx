@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useAppStore } from '@/store/useAppStore';
 import { MemoryItem } from '@/types';
 import { ORB_THEMES } from '@/lib/orb/theme';
+import { INITIAL_MEMORIES } from '@/services/memoryService';
 import { Database, Sparkles, AlertTriangle, Shield, Settings, Tag, X, Info, Zap } from 'lucide-react';
 import { audioService } from '@/services/audioService';
 
@@ -23,51 +24,75 @@ export const NeuralMemoryGraph3D: React.FC<{ memories: MemoryItem[] }> = ({ memo
   const [selectedNode, setSelectedNode] = useState<MemoryItem | null>(null);
   const [hoveredNode, setHoveredNode] = useState<MemoryItem | null>(null);
 
+  // Guarantee non-empty memories
+  const activeMemories = memories && memories.length > 0 ? memories : INITIAL_MEMORIES;
+
   useEffect(() => {
     if (!mountRef.current) return;
 
-    const width = mountRef.current.clientWidth;
-    const height = mountRef.current.clientHeight;
+    const width = mountRef.current.clientWidth || 800;
+    const height = mountRef.current.clientHeight || 620;
 
-    // 1. Scene, Camera, Renderer
+    // 1. Scene, Deep Cyberpunk Background & Fog
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x000000, 0.015);
+    scene.background = new THREE.Color(0x06060c);
+    scene.fog = new THREE.FogExp2(0x06060c, 0.012);
 
     const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
     camera.position.set(0, 15, 45);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setSize(width, height);
+    renderer.setClearColor(0x06060c, 1);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     mountRef.current.appendChild(renderer.domElement);
 
     // 2. Ambient & Point Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
     scene.add(ambientLight);
 
-    const coreLight = new THREE.PointLight(themeConfig.bright, 3, 100);
+    const coreLight = new THREE.PointLight(themeConfig.bright, 4, 120);
     coreLight.position.set(0, 0, 0);
     scene.add(coreLight);
 
-    // 3. Central Core Brain Nucleus
-    const nucleusGeo = new THREE.IcosahedronGeometry(4, 2);
+    // 3. Background Starfield (1,500 glowing stars)
+    const starGeo = new THREE.BufferGeometry();
+    const starCount = 1500;
+    const starPos = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount * 3; i += 3) {
+      starPos[i] = (Math.random() - 0.5) * 160;
+      starPos[i + 1] = (Math.random() - 0.5) * 160;
+      starPos[i + 2] = (Math.random() - 0.5) * 160;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const starMat = new THREE.PointsMaterial({
+      color: 0x4477aa,
+      size: 0.8,
+      transparent: true,
+      opacity: 0.6,
+    });
+    const starField = new THREE.Points(starGeo, starMat);
+    scene.add(starField);
+
+    // 4. Central Core Brain Nucleus
+    const nucleusGeo = new THREE.IcosahedronGeometry(4.5, 2);
     const nucleusMat = new THREE.MeshStandardMaterial({
       color: themeConfig.bright,
       wireframe: true,
       emissive: themeConfig.bright,
-      emissiveIntensity: 0.6,
+      emissiveIntensity: 0.8,
     });
     const nucleusMesh = new THREE.Mesh(nucleusGeo, nucleusMat);
     scene.add(nucleusMesh);
 
-    // Inner glowing core
+    // Inner glowing core sphere
     const innerCore = new THREE.Mesh(
-      new THREE.SphereGeometry(2.5, 16, 16),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: false })
+      new THREE.SphereGeometry(2.8, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
     );
     scene.add(innerCore);
 
-    // 4. Memory Color Mapping
+    // 5. Memory Color Mapping
     const getCategoryColor = (cat: string) => {
       switch (cat) {
         case 'pattern':
@@ -85,15 +110,14 @@ export const NeuralMemoryGraph3D: React.FC<{ memories: MemoryItem[] }> = ({ memo
       }
     };
 
-    // 5. Build Memory Nodes in 3D Space
+    // 6. Build Memory Nodes in 3D Golden Spiral Constellation
     const nodeObjects: Node3D[] = [];
     const group = new THREE.Group();
     scene.add(group);
 
-    const count = memories.length || 1;
-    memories.forEach((mem, idx) => {
-      // Golden Spiral distribution on sphere
-      const phi = Math.acos(-1 + (2 * idx) / count);
+    const count = activeMemories.length;
+    activeMemories.forEach((mem, idx) => {
+      const phi = Math.acos(-1 + (2 * idx) / Math.max(1, count - 1));
       const theta = Math.sqrt(count * Math.PI) * phi;
       const radius = 18 + (idx % 3) * 4;
 
@@ -106,12 +130,12 @@ export const NeuralMemoryGraph3D: React.FC<{ memories: MemoryItem[] }> = ({ memo
       const colorHex = getCategoryColor(mem.category);
 
       // Node Sphere
-      const nodeGeo = new THREE.SphereGeometry(1.2, 16, 16);
+      const nodeGeo = new THREE.SphereGeometry(1.4, 16, 16);
       const nodeMat = new THREE.MeshStandardMaterial({
         color: colorHex,
         emissive: colorHex,
-        emissiveIntensity: 0.5,
-        roughness: 0.2,
+        emissiveIntensity: 0.6,
+        roughness: 0.1,
       });
       const nodeMesh = new THREE.Mesh(nodeGeo, nodeMat);
       nodeMesh.position.copy(pos);
@@ -119,12 +143,12 @@ export const NeuralMemoryGraph3D: React.FC<{ memories: MemoryItem[] }> = ({ memo
       group.add(nodeMesh);
 
       // Halo Wireframe Ring
-      const haloGeo = new THREE.RingGeometry(1.6, 2.0, 16);
+      const haloGeo = new THREE.RingGeometry(1.8, 2.3, 16);
       const haloMat = new THREE.MeshBasicMaterial({
         color: colorHex,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.4,
+        opacity: 0.5,
       });
       const haloMesh = new THREE.Mesh(haloGeo, haloMat);
       haloMesh.position.copy(pos);
@@ -144,16 +168,16 @@ export const NeuralMemoryGraph3D: React.FC<{ memories: MemoryItem[] }> = ({ memo
       });
     });
 
-    // 6. Synaptic Connecting Filaments (Laser Lines)
+    // 7. Synaptic Connecting Filaments (Laser Lines)
     const lineMat = new THREE.LineBasicMaterial({
       color: themeConfig.bright,
       transparent: true,
-      opacity: 0.25,
+      opacity: 0.35,
     });
 
     const linePositions: number[] = [];
     nodeObjects.forEach((node, i) => {
-      // Connect to nucleus
+      // Connect to central nucleus
       linePositions.push(0, 0, 0, node.pos.x, node.pos.y, node.pos.z);
 
       // Connect to nearest neighbor
@@ -168,7 +192,7 @@ export const NeuralMemoryGraph3D: React.FC<{ memories: MemoryItem[] }> = ({ memo
     const linesMesh = new THREE.LineSegments(lineGeo, lineMat);
     group.add(linesMesh);
 
-    // 7. Raycasting & Mouse Drag Rotation
+    // 8. Raycasting & Mouse Drag Rotation
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2(-1000, -1000);
     let isDragging = false;
@@ -217,7 +241,7 @@ export const NeuralMemoryGraph3D: React.FC<{ memories: MemoryItem[] }> = ({ memo
     window.addEventListener('mouseup', onPointerUp);
     dom.addEventListener('click', onClick);
 
-    // 8. Animation Loop
+    // 9. Animation Loop
     let animationFrameId: number;
     let clock = new THREE.Clock();
 
@@ -231,10 +255,12 @@ export const NeuralMemoryGraph3D: React.FC<{ memories: MemoryItem[] }> = ({ memo
         group.rotation.x = Math.sin(elapsed * 0.2) * 0.08;
       }
 
+      starField.rotation.y += 0.0005;
+
       // Nucleus pulse
       nucleusMesh.rotation.y += 0.01;
       nucleusMesh.rotation.x += 0.005;
-      const scale = 1 + Math.sin(elapsed * 2) * 0.06;
+      const scale = 1 + Math.sin(elapsed * 2) * 0.08;
       nucleusMesh.scale.set(scale, scale, scale);
 
       // Node halos face camera
@@ -259,7 +285,7 @@ export const NeuralMemoryGraph3D: React.FC<{ memories: MemoryItem[] }> = ({ memo
 
     animate();
 
-    // 9. Resize handler
+    // 10. Resize handler
     const handleResize = () => {
       if (!mountRef.current) return;
       const w = mountRef.current.clientWidth;
@@ -283,12 +309,12 @@ export const NeuralMemoryGraph3D: React.FC<{ memories: MemoryItem[] }> = ({ memo
       }
       renderer.dispose();
     };
-  }, [memories, theme, settings.soundEffects]);
+  }, [activeMemories, theme, settings.soundEffects]);
 
   return (
-    <div className="relative w-full h-[620px] rounded-3xl bg-zinc-950 border border-zinc-800 overflow-hidden shadow-2xl font-mono select-none">
+    <div className="relative w-full h-[620px] rounded-3xl bg-[#06060c] border border-zinc-800 overflow-hidden shadow-2xl font-mono select-none">
       {/* 3D WebGL Canvas Mount */}
-      <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+      <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing bg-[#06060c]" />
 
       {/* Top HUD Telemetry */}
       <div className="absolute top-4 left-4 z-20 flex items-center gap-2 p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 backdrop-blur-md text-xs">
@@ -296,13 +322,13 @@ export const NeuralMemoryGraph3D: React.FC<{ memories: MemoryItem[] }> = ({ memo
         <div>
           <span className="font-bold text-white tracking-wider">3D SYNAPTIC BRAIN MATRIX</span>
           <span className="text-[10px] text-zinc-400 block">
-            {memories.length} Active Nodes • Drag to rotate in 3D
+            {activeMemories.length} Active Nodes • Drag to rotate in 3D
           </span>
         </div>
       </div>
 
       {/* Category Legend */}
-      <div className="absolute top-4 right-4 z-20 hidden md:flex flex-col gap-1 p-2 rounded-xl bg-zinc-900/80 border border-zinc-800 backdrop-blur-md text-[10px]">
+      <div className="absolute top-4 right-4 z-20 hidden md:flex flex-col gap-1 p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 backdrop-blur-md text-[10px]">
         <div className="flex items-center gap-1.5 text-purple-400 font-bold">
           <span className="w-2 h-2 rounded-full bg-purple-500" /> Patterns / Models
         </div>

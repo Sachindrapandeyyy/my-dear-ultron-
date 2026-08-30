@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { ORB_THEMES } from '@/lib/orb/theme';
 import {
@@ -29,6 +29,10 @@ export const MemoryHub: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'3d' | 'list'>('3d');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  useEffect(() => {
+    refreshMemories();
+  }, []);
 
   // Form State for new memory
   const [newTitle, setNewTitle] = useState('');
