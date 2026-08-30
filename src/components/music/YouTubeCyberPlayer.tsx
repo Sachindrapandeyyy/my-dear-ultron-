@@ -12,78 +12,109 @@ import {
   Radio,
   Sparkles,
   Volume2,
+  Film,
+  Tv,
+  Layers,
+  Flame,
+  ArrowRight,
+  TrendingUp,
+  RefreshCw,
 } from 'lucide-react';
 import { audioService } from '@/services/audioService';
 
-interface MusicPreset {
+interface YouTubeItem {
   id: string;
   title: string;
-  genre: string;
+  channel: string;
+  category: 'music' | 'tech' | 'live' | 'epic';
   videoId: string;
   icon: string;
 }
 
-const MUSIC_PRESETS: MusicPreset[] = [
+const YOUTUBE_CURATED_FEED: YouTubeItem[] = [
+  // 1. Music & Soundtracks
   {
-    id: 'synthwave',
-    title: 'Cyberpunk & Synthwave Radio',
-    genre: '🌃 Retrowave',
+    id: 'synthwave-radio',
+    title: 'Lofi Cyberpunk & Synthwave Radio 24/7',
+    channel: 'Lofi Geek Live',
+    category: 'live',
     videoId: '4xDzrJKXOOY',
     icon: '🌃',
   },
   {
-    id: 'iron-man',
-    title: 'AC/DC - Back in Black (Official)',
-    genre: '⚡ Stark Rock',
-    videoId: 'pAgnJDJN4VA',
-    icon: '⚡',
-  },
-  {
-    id: 'interstellar',
-    title: 'Hans Zimmer - Interstellar Live Suite',
-    genre: '🌌 Epic Cinema',
-    videoId: 'UDVtMYqUAyw',
-    icon: '🌌',
-  },
-  {
-    id: 'lofi',
-    title: 'Lofi Girl - Chill Beats Radio',
-    genre: '☕ Chill Focus',
+    id: 'lofi-girl',
+    title: 'Lofi Girl - Relax / Study Beats Live',
+    channel: 'Lofi Girl',
+    category: 'live',
     videoId: 'jfKfPfyJRdk',
     icon: '☕',
   },
   {
-    id: 'phonk',
-    title: 'Kordhell - Murder In My Mind',
-    genre: '🏎️ Drift Phonk',
+    id: 'iss-earth',
+    title: 'NASA ISS Live Earth from Space Camera',
+    channel: 'NASA Stream',
+    category: 'live',
+    videoId: 'xRPjKOmdsRA',
+    icon: '🌍',
+  },
+  {
+    id: 'iron-man-rock',
+    title: 'AC/DC - Back in Black (Iron Man Theme)',
+    channel: 'AC/DC Official',
+    category: 'music',
+    videoId: 'pAgnJDJN4VA',
+    icon: '⚡',
+  },
+  {
+    id: 'interstellar-suite',
+    title: 'Hans Zimmer - Interstellar OST Live Suite',
+    channel: 'Hans Zimmer Official',
+    category: 'epic',
+    videoId: 'UDVtMYqUAyw',
+    icon: '🌌',
+  },
+  {
+    id: 'avengers-theme',
+    title: 'The Avengers - Main Theme Suite',
+    channel: 'Marvel Music',
+    category: 'epic',
+    videoId: 'O-zpOMYRi0w',
+    icon: '🦸',
+  },
+  {
+    id: 'phonk-murder',
+    title: 'Kordhell - Murder In My Mind (Drift Phonk)',
+    channel: 'Kordhell',
+    category: 'music',
     videoId: 'w-sQRS-Mun8',
     icon: '🏎️',
   },
   {
-    id: 'marvel',
-    title: 'The Avengers - Main Theme Suite',
-    genre: '🦸 Marvel Epic',
-    videoId: 'O-zpOMYRi0w',
-    icon: '🦸',
+    id: 'fireship-tech',
+    title: 'Fireship - 100+ Computer Science Concepts',
+    channel: 'Fireship',
+    category: 'tech',
+    videoId: 'vLnPwxZdW4Y',
+    icon: '💻',
   },
 ];
 
-// Helper to extract YouTube Video ID from any URL or query
-function parseYouTubeVideoId(input: string): string | null {
+// Helper to extract YouTube Video ID from any input or URL
+function parseYouTubeId(input: string): string | null {
   const trimmed = input.trim();
-  // 1. Direct ID (11 chars)
-  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
-    return trimmed;
-  }
-  // 2. youtube.com/watch?v=...
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
+
   const watchMatch = trimmed.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
   if (watchMatch) return watchMatch[1];
-  // 3. youtu.be/...
+
   const shortMatch = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
   if (shortMatch) return shortMatch[1];
-  // 4. youtube.com/embed/...
+
   const embedMatch = trimmed.match(/embed\/([a-zA-Z0-9_-]{11})/);
   if (embedMatch) return embedMatch[1];
+
+  const shortsMatch = trimmed.match(/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (shortsMatch) return shortsMatch[1];
 
   return null;
 }
@@ -93,40 +124,38 @@ export const YouTubeCyberPlayer: React.FC = () => {
   const themeConfig = ORB_THEMES[theme];
 
   const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [currentVideoId, setCurrentVideoId] = useState('4xDzrJKXOOY'); // Default Synthwave
-  const [currentTitle, setCurrentTitle] = useState('Cyberpunk & Synthwave Radio');
-  const [searchInput, setSearchInput] = useState('');
-  const [activePreset, setActivePreset] = useState('synthwave');
+  const [viewMode, setViewMode] = useState<'compact' | 'theater' | 'fullscreen'>('theater');
+  const [currentVideoId, setCurrentVideoId] = useState('4xDzrJKXOOY');
+  const [currentTitle, setCurrentTitle] = useState('Lofi Cyberpunk & Synthwave Radio 24/7');
+  const [currentChannel, setCurrentChannel] = useState('Lofi Geek Live');
+  const [urlOrSearchInput, setUrlOrSearchInput] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string>('all');
 
   // Listen for voice action triggers
   useEffect(() => {
     const handleVoicePlay = (e: any) => {
       const rawQuery = (e.detail?.query || '').trim().toLowerCase();
       setIsOpen(true);
-      setIsMinimized(false);
 
       if (settings.soundEffects) audioService.playSuccessChime();
 
-      // Check if matches known preset keywords
-      if (rawQuery.includes('iron man') || rawQuery.includes('back in black') || rawQuery.includes('ac dc')) {
-        handleSelectPreset(MUSIC_PRESETS[1]);
-      } else if (rawQuery.includes('interstellar') || rawQuery.includes('hans zimmer')) {
-        handleSelectPreset(MUSIC_PRESETS[2]);
-      } else if (rawQuery.includes('lofi') || rawQuery.includes('chill') || rawQuery.includes('study')) {
-        handleSelectPreset(MUSIC_PRESETS[3]);
-      } else if (rawQuery.includes('phonk') || rawQuery.includes('drift')) {
-        handleSelectPreset(MUSIC_PRESETS[4]);
-      } else if (rawQuery.includes('avengers') || rawQuery.includes('marvel')) {
-        handleSelectPreset(MUSIC_PRESETS[5]);
+      // Find best match in curated feed
+      const matched = YOUTUBE_CURATED_FEED.find((item) =>
+        item.title.toLowerCase().includes(rawQuery) ||
+        item.channel.toLowerCase().includes(rawQuery) ||
+        rawQuery.includes(item.id)
+      );
+
+      if (matched) {
+        handlePlayVideo(matched);
       } else {
-        // Try parsing video ID or open search
-        const parsed = parseYouTubeVideoId(rawQuery);
+        const parsed = parseYouTubeId(rawQuery);
         if (parsed) {
           setCurrentVideoId(parsed);
-          setCurrentTitle(rawQuery);
+          setCurrentTitle(`YouTube Stream (${parsed})`);
+          setCurrentChannel('Custom Stream');
         } else {
-          // Open YouTube search directly in pop-up or window
+          // Open direct YouTube Search
           window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(rawQuery)}`, '_blank');
         }
       }
@@ -150,171 +179,219 @@ export const YouTubeCyberPlayer: React.FC = () => {
 
   if (!isOpen) return null;
 
-  const handleSelectPreset = (preset: MusicPreset) => {
+  const handlePlayVideo = (item: YouTubeItem) => {
     if (settings.soundEffects) audioService.playClickSound();
-    setActivePreset(preset.id);
-    setCurrentVideoId(preset.videoId);
-    setCurrentTitle(preset.title);
-    setSearchInput(preset.title);
+    setCurrentVideoId(item.videoId);
+    setCurrentTitle(item.title);
+    setCurrentChannel(item.channel);
+    setUrlOrSearchInput(`https://www.youtube.com/watch?v=${item.videoId}`);
   };
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const handleSearchOrUrlSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchInput.trim()) return;
+    if (!urlOrSearchInput.trim()) return;
     if (settings.soundEffects) audioService.playClickSound();
 
-    const parsedId = parseYouTubeVideoId(searchInput);
+    const parsedId = parseYouTubeId(urlOrSearchInput);
     if (parsedId) {
       setCurrentVideoId(parsedId);
-      setCurrentTitle(searchInput);
-      setActivePreset('');
+      setCurrentTitle(`YouTube Stream (${parsedId})`);
+      setCurrentChannel('Direct Link');
     } else {
-      // Open search in YouTube
-      const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchInput.trim())}`;
-      window.open(url, '_blank');
+      // General search: opens full search in a new window
+      const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(urlOrSearchInput.trim())}`;
+      window.open(searchUrl, '_blank');
     }
   };
 
-  const openInYouTubeTab = () => {
-    const url = `https://www.youtube.com/watch?v=${currentVideoId}`;
-    window.open(url, '_blank');
+  const openInFullYouTubeTab = () => {
+    window.open(`https://www.youtube.com/watch?v=${currentVideoId}`, '_blank');
   };
 
-  const embedSrc = `https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1&enablejsapi=1&rel=0`;
+  const openYouTubeHome = () => {
+    window.open('https://www.youtube.com', '_blank');
+  };
+
+  const embedSrc = `https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1&enablejsapi=1&rel=0&modestbranding=1&playsinline=1`;
+
+  const filteredFeed = YOUTUBE_CURATED_FEED.filter(
+    (item) => activeCategory === 'all' || item.category === activeCategory
+  );
 
   return (
     <div
       className={`fixed z-40 transition-all duration-300 font-mono ${
-        isMinimized
-          ? 'bottom-20 right-6 w-72'
-          : 'bottom-20 right-6 w-[360px] md:w-[420px] max-w-[92vw]'
-      } rounded-2xl bg-zinc-950/95 border backdrop-blur-xl shadow-2xl overflow-hidden`}
+        viewMode === 'fullscreen'
+          ? 'inset-4 md:inset-8 w-auto h-auto'
+          : viewMode === 'theater'
+          ? 'bottom-16 right-4 md:right-8 w-[720px] max-w-[95vw] h-[520px] max-h-[85vh]'
+          : 'bottom-16 right-4 w-[380px] max-w-[92vw] h-auto'
+      } rounded-3xl bg-zinc-950/95 border-2 backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col`}
       style={{
         borderColor: themeConfig.cssPrimary,
-        boxShadow: `0 0 30px ${themeConfig.cssGlow}`,
+        boxShadow: `0 0 40px ${themeConfig.cssGlow}`,
       }}
     >
-      {/* Header Bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-900/90 border-b border-zinc-800 select-none">
-        <div className="flex items-center gap-2">
-          <Music className="w-4 h-4 text-red-500" />
-          <span className="text-xs font-bold tracking-wider text-white">
-            YOUTUBE CYBER-DOCK
-          </span>
-          <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+      {/* Top Holographic Navigation Bar */}
+      <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/90 border-b border-zinc-800 select-none">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-red-600/20 border border-red-500/60 flex items-center justify-center">
+            <Film className="w-4 h-4 text-red-500" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold tracking-wider text-white">
+                YOUTUBE CYBER-HUB
+              </span>
+              <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+            </div>
+            <span className="text-[10px] text-zinc-400 truncate max-w-xs block font-bold">
+              {currentChannel} • {currentTitle}
+            </span>
+          </div>
         </div>
 
+        {/* Action Controls */}
         <div className="flex items-center gap-1.5 text-zinc-400">
           <button
-            onClick={openInYouTubeTab}
-            title="Open in Full YouTube Tab"
-            className="p-1 hover:text-white hover:bg-zinc-800 rounded transition-all"
+            onClick={openYouTubeHome}
+            title="Open YouTube.com Main Portal"
+            className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] text-zinc-300 font-bold flex items-center gap-1 transition-all"
           >
-            <ExternalLink className="w-3.5 h-3.5" />
+            <ExternalLink className="w-3 h-3" />
+            <span className="hidden sm:inline">YOUTUBE.COM</span>
           </button>
+
           <button
-            onClick={() => setIsMinimized((prev) => !prev)}
-            title={isMinimized ? 'Expand Player' : 'Minimize Player'}
-            className="p-1 hover:text-white hover:bg-zinc-800 rounded transition-all"
+            onClick={openInFullYouTubeTab}
+            title="Open Current Video in Tab"
+            className="p-1.5 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
           >
-            {isMinimized ? <Maximize2 className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
+            <Tv className="w-3.5 h-3.5" />
           </button>
+
+          <button
+            onClick={() => {
+              if (viewMode === 'compact') setViewMode('theater');
+              else if (viewMode === 'theater') setViewMode('fullscreen');
+              else setViewMode('compact');
+            }}
+            title="Cycle View Size (Compact / Theater / Fullscreen)"
+            className="p-1.5 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
+          >
+            {viewMode === 'fullscreen' ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          </button>
+
           <button
             onClick={() => setIsOpen(false)}
             title="Close Player"
-            className="p-1 hover:text-red-400 hover:bg-zinc-800 rounded transition-all"
+            className="p-1.5 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition-all"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Main Player Content (Hidden when minimized) */}
-      {!isMinimized && (
-        <div className="p-3 space-y-3">
-          {/* Search or Video URL Input */}
-          <form onSubmit={handleSearchSubmit} className="flex gap-1.5">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        {/* Left Side: Video Player & Address Bar */}
+        <div className="flex-1 flex flex-col p-3 space-y-3 overflow-y-auto">
+          {/* Universal Address & Search Bar */}
+          <form onSubmit={handleSearchOrUrlSubmit} className="flex gap-1.5">
             <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
               <input
                 type="text"
-                placeholder="Enter YouTube Link, Video ID, or Search..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 font-mono"
+                placeholder="Paste ANY YouTube Link (watch?v=, youtu.be, shorts) or search..."
+                value={urlOrSearchInput}
+                onChange={(e) => setUrlOrSearchInput(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 font-mono"
               />
             </div>
             <button
               type="submit"
-              className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-lg flex items-center gap-1 transition-all"
+              className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl flex items-center gap-1 transition-all shadow-md"
             >
               <Play className="w-3 h-3 fill-current" />
-              <span>STREAM</span>
+              <span>LOAD</span>
             </button>
           </form>
 
-          {/* YouTube Video / Music Embed */}
-          <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-zinc-800 shadow-inner">
+          {/* Full Embedded YouTube Player */}
+          <div className="relative w-full flex-1 min-h-[220px] rounded-2xl overflow-hidden bg-black border border-zinc-800 shadow-2xl">
             <iframe
               key={currentVideoId}
               src={embedSrc}
-              title="YouTube Cyber Player"
+              title="YouTube Cyber Hub"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
-              className="w-full h-full border-0"
+              className="w-full h-full border-0 absolute inset-0"
             />
           </div>
+        </div>
 
-          {/* Curated 1-Click Presets Bar */}
-          <div className="space-y-1.5">
-            <div className="text-[10px] text-zinc-500 uppercase tracking-widest flex items-center justify-between select-none">
-              <span>Cyberpunk Audio Matrix</span>
-              <span className="text-zinc-400">1-Click Direct Play</span>
+        {/* Right Side: Curated Cyber Feed (Hidden in compact mode) */}
+        {viewMode !== 'compact' && (
+          <div className="w-full md:w-64 border-t md:border-t-0 md:border-l border-zinc-800/80 p-3 bg-zinc-950/60 flex flex-col space-y-2.5 overflow-y-auto">
+            <div className="flex items-center justify-between select-none">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-200">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                <span>CYBER FEED</span>
+              </div>
+              <span className="text-[10px] text-zinc-500 uppercase">1-Click Play</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-1.5">
-              {MUSIC_PRESETS.map((p) => {
-                const isSelected = activePreset === p.id;
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none select-none">
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'live', label: '🔴 Live' },
+                { id: 'music', label: '🎵 Music' },
+                { id: 'epic', label: '🌌 Epic' },
+                { id: 'tech', label: '💻 Tech' },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all whitespace-nowrap ${
+                    activeCategory === cat.id
+                      ? 'bg-zinc-800 text-white border-red-500'
+                      : 'bg-zinc-900/60 text-zinc-400 border-zinc-800 hover:text-zinc-200'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Video List */}
+            <div className="space-y-1.5 flex-1 overflow-y-auto">
+              {filteredFeed.map((item) => {
+                const isActive = currentVideoId === item.videoId;
                 return (
                   <button
-                    key={p.id}
-                    onClick={() => handleSelectPreset(p)}
-                    className={`p-2 rounded-lg border text-left flex items-center gap-2 transition-all select-none ${
-                      isSelected
-                        ? 'bg-zinc-800 text-white border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
-                        : 'bg-zinc-900/60 text-zinc-400 border-zinc-800 hover:bg-zinc-900 hover:text-zinc-200'
+                    key={item.id}
+                    onClick={() => handlePlayVideo(item)}
+                    className={`w-full p-2 rounded-xl border text-left flex items-center gap-2.5 transition-all select-none ${
+                      isActive
+                        ? 'bg-zinc-800/90 text-white border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.25)]'
+                        : 'bg-zinc-900/50 text-zinc-400 border-zinc-800/80 hover:bg-zinc-900 hover:text-zinc-200'
                     }`}
                   >
-                    <span className="text-base">{p.icon}</span>
-                    <div className="truncate">
-                      <div className="text-[11px] font-bold truncate text-white">{p.genre}</div>
-                      <div className="text-[9px] text-zinc-400 truncate">{p.title}</div>
+                    <span className="text-xl shrink-0">{item.icon}</span>
+                    <div className="truncate flex-1">
+                      <div className="text-[11px] font-bold truncate text-white leading-tight">
+                        {item.title}
+                      </div>
+                      <div className="text-[9px] text-zinc-400 truncate mt-0.5">{item.channel}</div>
                     </div>
                   </button>
                 );
               })}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Minimized Dock Footer */}
-      {isMinimized && (
-        <div className="p-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2 truncate pr-2">
-            <Radio className="w-3.5 h-3.5 text-red-400 animate-spin" />
-            <span className="text-[11px] font-bold text-white truncate font-mono">
-              {currentTitle}
-            </span>
-          </div>
-          <button
-            onClick={() => setIsMinimized(false)}
-            className="px-2 py-1 rounded bg-zinc-800 text-zinc-300 text-[10px] font-bold hover:bg-zinc-700"
-          >
-            RESTORE
-          </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
