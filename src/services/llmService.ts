@@ -146,69 +146,82 @@ export class LLMService {
         }),
     ];
 
-    const response = await fetch(`${endpoint}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: formattedMessages,
-        stream: true,
-        options: {
-          temperature: 0.7,
-          top_p: 0.9,
-          num_predict: 2048,
-        },
-      }),
-    });
+    // Candidate models to try in order of priority
+    const modelsToTry = [model, 'llama3.2:latest', 'llama3.2', 'nemotron-mini:latest', 'nemotron-mini'];
+    const endpointsToTry = [endpoint, 'http://127.0.0.1:11434', 'http://localhost:11434'];
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} from Ollama`);
-    }
+    let lastError: Error | null = null;
 
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    let accumulated = '';
-    let buffer = '';
+    for (const ep of endpointsToTry) {
+      for (const targetModel of Array.from(new Set(modelsToTry))) {
+        try {
+          const response = await fetch(`${ep}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: hasImageInActiveQuery ? 'moondream:latest' : targetModel,
+              messages: formattedMessages,
+              stream: true,
+              options: {
+                temperature: 0.7,
+                top_p: 0.9,
+                num_predict: 2048,
+              },
+            }),
+          });
 
-    if (!reader) throw new Error('Failed to read Ollama stream');
+          if (!response.ok) continue;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let accumulated = '';
+          let buffer = '';
 
-      for (const line of lines) {
-        if (line.trim()) {
-          try {
-            const data = JSON.parse(line);
-            const content = data.message?.content || data.response || '';
-            if (content) {
-              accumulated += content;
-              onChunk(content);
+          if (!reader) continue;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (line.trim()) {
+                try {
+                  const data = JSON.parse(line);
+                  const content = data.message?.content || data.response || '';
+                  if (content) {
+                    accumulated += content;
+                    onChunk(content);
+                  }
+                } catch {}
+              }
             }
-          } catch {}
+          }
+
+          if (buffer.trim()) {
+            try {
+              const data = JSON.parse(buffer);
+              const content = data.message?.content || data.response || '';
+              if (content) {
+                accumulated += content;
+                onChunk(content);
+              }
+            } catch {}
+          }
+
+          if (accumulated.trim()) {
+            onComplete(accumulated);
+            return;
+          }
+        } catch (err: any) {
+          lastError = err;
         }
       }
     }
 
-    if (buffer.trim()) {
-      try {
-        const data = JSON.parse(buffer);
-        const content = data.message?.content || data.response || '';
-        if (content) {
-          accumulated += content;
-          onChunk(content);
-        }
-      } catch {}
-    }
-
-    if (!accumulated.trim()) {
-      throw new Error('Empty response from Ollama');
-    }
-
-    onComplete(accumulated);
+    throw lastError || new Error('Ollama models unreachable');
   }
 
   private async callGeminiStream(
