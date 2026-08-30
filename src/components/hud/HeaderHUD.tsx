@@ -22,6 +22,7 @@ import {
   ExternalLink,
   ShieldAlert,
   Lock as LockIcon,
+  Music,
 } from 'lucide-react';
 import { audioService } from '@/services/audioService';
 import { ollamaService, OllamaStatus } from '@/services/ollamaService';
@@ -220,6 +221,20 @@ export const HeaderHUD: React.FC = () => {
           >
             <LockIcon className="w-3.5 h-3.5" />
             <span className="hidden md:inline">LOCK</span>
+          </button>
+
+          {/* YouTube Cyber Music Player Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (settings.soundEffects) audioService.playClickSound();
+              window.dispatchEvent(new CustomEvent('ultron-toggle-music-player', { detail: { state: 'toggle' } }));
+            }}
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-red-400 hover:text-red-300 text-xs font-mono transition-all"
+            title="Launch YouTube Cyber Music Player"
+          >
+            <Music className="w-3.5 h-3.5 text-red-400" />
+            <span className="hidden md:inline">MUSIC</span>
           </button>
 
           {/* Phone Sync Button */}

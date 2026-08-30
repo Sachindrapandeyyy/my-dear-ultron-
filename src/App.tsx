@@ -11,6 +11,7 @@ import { SettingsModal } from '@/components/settings/SettingsModal';
 import { InteractiveTerminal } from '@/components/terminal/InteractiveTerminal';
 import { FaceLockScreen } from '@/components/security/FaceLockScreen';
 import { FaceEnrollModal } from '@/components/security/FaceEnrollModal';
+import { YouTubeCyberPlayer } from '@/components/music/YouTubeCyberPlayer';
 import { audioService } from '@/services/audioService';
 
 export const App: React.FC = () => {
@@ -83,6 +84,9 @@ export const App: React.FC = () => {
 
       {/* Biometric Face ID Enrollment Modal */}
       {isEnrollModalOpen && <FaceEnrollModal />}
+
+      {/* Floating Holographic YouTube Music & Video Cyber-Dock */}
+      <YouTubeCyberPlayer />
     </div>
   );
 };
