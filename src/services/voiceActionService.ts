@@ -1,4 +1,4 @@
-import { useAppStore } from '@/store/useAppStore';
+﻿import { useAppStore } from '@/store/useAppStore';
 import { OrbTheme } from '@/types';
 import { soulService } from '@/services/soulService';
 import { osService } from '@/services/osService';
@@ -17,10 +17,50 @@ class VoiceActionService {
     const raw = input.trim().toLowerCase();
     const { setTheme, setActiveTab, setActiveSoul, clearMessages, telemetry } = useAppStore.getState();
 
-    // 0. Biometric Security & Sentry Voice Commands
-    if (raw.includes('lock system') || raw.includes('lock screen') || raw.includes('lock desktop') || raw.includes('secure desktop')) {
+    // 0. Web & App Automation: Open Websites (YouTube, Google, GitHub, etc.)
+    const openUrlMatch = raw.match(/^open\s+([a-zA-Z0-9\.\-]+\.[a-zA-Z]{2,})(?:\/.*)?$/);
+    if (openUrlMatch || raw.startsWith('open youtube') || raw.startsWith('open google') || raw.startsWith('open github')) {
+      let targetDomain = openUrlMatch ? openUrlMatch[1] : '';
+      if (raw.includes('youtube')) targetDomain = 'youtube.com';
+      else if (raw.includes('google')) targetDomain = 'google.com';
+      else if (raw.includes('github')) targetDomain = 'github.com';
+
+      if (targetDomain) {
+        const fullUrl = `https://${targetDomain}`;
+        if (typeof window !== 'undefined') {
+          window.open(fullUrl, '_blank');
+        }
+        return {
+          handled: true,
+          responseMessage: `Activating Web Interface. Navigating to ${targetDomain}... Page opened in a new browser window.`,
+        };
+      }
+    }
+
+    // 1. Gesture Tracking Control by Voice
+    if (raw.includes('start the gesture') || raw.includes('start gesture') || raw.includes('enable gesture') || raw.includes('turn on gesture') || raw.includes('use my keyboard and start the gesture')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ultron-toggle-camera', { detail: { mode: 'on' } }));
+      }
+      return {
+        handled: true,
+        responseMessage: 'Gesture tracking initiated. You can now use 1-hand pinch to rotate and 2-hand pinch to zoom the 3D Orb.',
+      };
+    }
+    if (raw.includes('stop gesture') || raw.includes('disable gesture') || raw.includes('turn off gesture')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ultron-toggle-camera', { detail: { mode: 'off' } }));
+      }
+      return {
+        handled: true,
+        responseMessage: 'Gesture tracking deactivated.',
+      };
+    }
+
+    // 2. Biometric Security & Sentry Voice Commands
+    if (raw.includes('lock yourself') || raw.includes('lock system') || raw.includes('lock screen') || raw.includes('lock desktop') || raw.includes('secure desktop')) {
       useAppStore.getState().setIsLocked(true);
-      return { handled: true, responseMessage: 'Biometric Face ID lock matrix engaged. Desktop secured.' };
+      return { handled: true, responseMessage: 'Security protocols engaged. Biometric Face ID lock barrier active.' };
     }
     if (raw.includes('enable sentry') || raw.includes('activate sentry') || raw.includes('guard mode on') || raw.includes('start sentry')) {
       useAppStore.getState().setIsSentryActive(true);
@@ -35,7 +75,7 @@ class VoiceActionService {
       return { handled: true, responseMessage: 'Opening Biometric Face ID Enrollment Scanner.' };
     }
 
-    // 1. Orb Color & Theme Voice Commands
+    // 3. Orb Color & Theme Voice Commands
     if (
       raw.includes('change color') ||
       raw.includes('change theme') ||
@@ -43,7 +83,8 @@ class VoiceActionService {
       raw.includes('make it') ||
       raw.includes('switch color') ||
       raw.includes('switch theme') ||
-      raw.includes('theme to')
+      raw.includes('theme to') ||
+      raw.includes('color to')
     ) {
       if (raw.includes('blue') || raw.includes('cyan') || raw.includes('arc')) {
         setTheme('arc');
@@ -67,7 +108,7 @@ class VoiceActionService {
       }
     }
 
-    // 2. Navigation & UI Tab Switching by Voice
+    // 4. Navigation & UI Tab Switching by Voice
     if (raw.includes('open terminal') || raw.includes('show terminal') || raw.includes('go to terminal')) {
       setActiveTab('terminal');
       return { handled: true, responseMessage: 'Opening Interactive OS Terminal.' };
@@ -76,7 +117,7 @@ class VoiceActionService {
       setActiveTab('chat');
       return { handled: true, responseMessage: 'Switching to Neural Chat Console.' };
     }
-    if (raw.includes('show orb') || raw.includes('show 3d') || raw.includes('open orb') || raw.includes('go to orb') || raw.includes('show matrix')) {
+    if (raw.includes('open of matrix') || raw.includes('open matrix') || raw.includes('show matrix') || raw.includes('show orb') || raw.includes('show 3d') || raw.includes('open orb') || raw.includes('go to orb')) {
       setActiveTab('orb');
       return { handled: true, responseMessage: 'Switching to 3D Holographic Viewport.' };
     }
@@ -93,7 +134,7 @@ class VoiceActionService {
       return { handled: true, responseMessage: 'Displaying Soul Presets and Personas.' };
     }
 
-    // 3. Persona / Soul Switching by Voice
+    // 5. Persona / Soul Switching by Voice
     if (raw.includes('switch to jarvis') || raw.includes('act like jarvis') || raw.includes('become jarvis')) {
       const jarvis = soulService.getById('jarvis');
       if (jarvis) {
@@ -119,7 +160,7 @@ class VoiceActionService {
       }
     }
 
-    // 4. Screen Capture Vision by Voice
+    // 6. Screen Capture Vision by Voice
     if (raw.includes('take screenshot') || raw.includes('capture screen') || raw.includes('look at my screen') || raw.includes('see my screen')) {
       const shot = await osService.captureScreen();
       if (shot) {
@@ -132,7 +173,7 @@ class VoiceActionService {
       }
     }
 
-    // 5. Battery & Laptop Telemetry by Voice
+    // 7. Battery & Laptop Telemetry by Voice
     if (raw.includes('check battery') || raw.includes('battery level') || raw.includes('battery status')) {
       const tel = osService.getTelemetry();
       const statusStr = tel.isCharging ? 'and charging on AC power' : 'running on battery';
@@ -149,7 +190,7 @@ class VoiceActionService {
       };
     }
 
-    // 6. Clear Logs / Purge by Voice
+    // 8. Clear Logs / Purge by Voice
     if (raw.includes('clear chat') || raw.includes('purge chat') || raw.includes('clear screen') || raw.includes('reset chat')) {
       clearMessages();
       return { handled: true, responseMessage: 'Chat history and buffers cleared.' };

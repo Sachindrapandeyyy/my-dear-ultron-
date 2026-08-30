@@ -102,6 +102,22 @@ export const JarvisOrb: React.FC = () => {
     else void startGestures();
   }, [startGestures, stopGestures, settings.soundEffects]);
 
+  // Listen for external voice toggle events
+  useEffect(() => {
+    const handleVoiceToggle = (e: any) => {
+      const mode = e.detail?.mode;
+      if (mode === 'on') {
+        if (!trackerRef.current) void startGestures();
+      } else if (mode === 'off') {
+        if (trackerRef.current) stopGestures();
+      } else {
+        toggleGestures();
+      }
+    };
+    window.addEventListener('ultron-toggle-camera', handleVoiceToggle);
+    return () => window.removeEventListener('ultron-toggle-camera', handleVoiceToggle);
+  }, [startGestures, stopGestures, toggleGestures]);
+
   // Keyboard controls
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
