@@ -18,7 +18,9 @@ import {
   Flame,
   ArrowRight,
   TrendingUp,
-  RefreshCw,
+  Headphones,
+  Compass,
+  Disc,
 } from 'lucide-react';
 import { audioService } from '@/services/audioService';
 
@@ -26,13 +28,26 @@ interface YouTubeItem {
   id: string;
   title: string;
   channel: string;
-  category: 'music' | 'tech' | 'live' | 'epic';
+  category: 'music' | 'hindi' | 'rock' | 'lofi' | 'phonk' | 'live' | 'epic';
   videoId: string;
   icon: string;
 }
 
+const QUICK_MUSIC_SEARCH_PROMPTS = [
+  'Arijit Singh Best Songs',
+  'Hans Zimmer Interstellar OST',
+  'AC/DC Back in Black Iron Man',
+  'Lofi Girl Chill Coding Beats',
+  'Drift Phonk Workout Mix',
+  'Bollywood Romantic Hits 2026',
+  'Imagine Dragons Believer',
+  'Alan Walker Faded Live',
+  'Coldplay Viva La Vida',
+  'Cyberpunk 2077 Radio Mix',
+];
+
 const YOUTUBE_CURATED_FEED: YouTubeItem[] = [
-  // 1. Music & Soundtracks
+  // 1. Live & Lofi
   {
     id: 'synthwave-radio',
     title: 'Lofi Cyberpunk & Synthwave Radio 24/7',
@@ -45,7 +60,7 @@ const YOUTUBE_CURATED_FEED: YouTubeItem[] = [
     id: 'lofi-girl',
     title: 'Lofi Girl - Relax / Study Beats Live',
     channel: 'Lofi Girl',
-    category: 'live',
+    category: 'lofi',
     videoId: 'jfKfPfyJRdk',
     icon: '☕',
   },
@@ -57,14 +72,16 @@ const YOUTUBE_CURATED_FEED: YouTubeItem[] = [
     videoId: 'xRPjKOmdsRA',
     icon: '🌍',
   },
+  // 2. Rock & Stark
   {
     id: 'iron-man-rock',
     title: 'AC/DC - Back in Black (Iron Man Theme)',
     channel: 'AC/DC Official',
-    category: 'music',
+    category: 'rock',
     videoId: 'pAgnJDJN4VA',
     icon: '⚡',
   },
+  // 3. Epic Cinema
   {
     id: 'interstellar-suite',
     title: 'Hans Zimmer - Interstellar OST Live Suite',
@@ -81,21 +98,23 @@ const YOUTUBE_CURATED_FEED: YouTubeItem[] = [
     videoId: 'O-zpOMYRi0w',
     icon: '🦸',
   },
+  // 4. Phonk & Energy
   {
     id: 'phonk-murder',
     title: 'Kordhell - Murder In My Mind (Drift Phonk)',
     channel: 'Kordhell',
-    category: 'music',
+    category: 'phonk',
     videoId: 'w-sQRS-Mun8',
     icon: '🏎️',
   },
+  // 5. Hindi & Bollywood Chill
   {
-    id: 'fireship-tech',
-    title: 'Fireship - 100+ Computer Science Concepts',
-    channel: 'Fireship',
-    category: 'tech',
-    videoId: 'vLnPwxZdW4Y',
-    icon: '💻',
+    id: 'hindi-chill',
+    title: 'Bollywood Lofi Chill Mashup (Arijit Singh / Atif)',
+    channel: 'Bollywood Chill',
+    category: 'hindi',
+    videoId: 'dZ0fwJojhrs',
+    icon: '🇮🇳',
   },
 ];
 
@@ -129,6 +148,7 @@ export const YouTubeCyberPlayer: React.FC = () => {
   const [currentTitle, setCurrentTitle] = useState('Lofi Cyberpunk & Synthwave Radio 24/7');
   const [currentChannel, setCurrentChannel] = useState('Lofi Geek Live');
   const [urlOrSearchInput, setUrlOrSearchInput] = useState('');
+  const [activeTab, setActiveTab] = useState<'feed' | 'search'>('search');
   const [activeCategory, setActiveCategory] = useState<string>('all');
 
   // Listen for voice action triggers
@@ -139,7 +159,7 @@ export const YouTubeCyberPlayer: React.FC = () => {
 
       if (settings.soundEffects) audioService.playSuccessChime();
 
-      // Find best match in curated feed
+      // Find match in curated feed
       const matched = YOUTUBE_CURATED_FEED.find((item) =>
         item.title.toLowerCase().includes(rawQuery) ||
         item.channel.toLowerCase().includes(rawQuery) ||
@@ -187,19 +207,21 @@ export const YouTubeCyberPlayer: React.FC = () => {
     setUrlOrSearchInput(`https://www.youtube.com/watch?v=${item.videoId}`);
   };
 
-  const handleSearchOrUrlSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!urlOrSearchInput.trim()) return;
+  const handleSearchOrUrlSubmit = (e?: React.FormEvent, customQuery?: string) => {
+    if (e) e.preventDefault();
+    const query = (customQuery || urlOrSearchInput).trim();
+    if (!query) return;
+
     if (settings.soundEffects) audioService.playClickSound();
 
-    const parsedId = parseYouTubeId(urlOrSearchInput);
+    const parsedId = parseYouTubeId(query);
     if (parsedId) {
       setCurrentVideoId(parsedId);
       setCurrentTitle(`YouTube Stream (${parsedId})`);
       setCurrentChannel('Direct Link');
     } else {
-      // General search: opens full search in a new window
-      const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(urlOrSearchInput.trim())}`;
+      // Direct YouTube Search in new window / tab with full results
+      const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
       window.open(searchUrl, '_blank');
     }
   };
@@ -208,8 +230,8 @@ export const YouTubeCyberPlayer: React.FC = () => {
     window.open(`https://www.youtube.com/watch?v=${currentVideoId}`, '_blank');
   };
 
-  const openYouTubeHome = () => {
-    window.open('https://www.youtube.com', '_blank');
+  const openYouTubeMusic = () => {
+    window.open('https://music.youtube.com', '_blank');
   };
 
   const embedSrc = `https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1&enablejsapi=1&rel=0&modestbranding=1&playsinline=1`;
@@ -224,7 +246,7 @@ export const YouTubeCyberPlayer: React.FC = () => {
         viewMode === 'fullscreen'
           ? 'inset-4 md:inset-8 w-auto h-auto'
           : viewMode === 'theater'
-          ? 'bottom-16 right-4 md:right-8 w-[720px] max-w-[95vw] h-[520px] max-h-[85vh]'
+          ? 'bottom-16 right-4 md:right-8 w-[740px] max-w-[95vw] h-[540px] max-h-[85vh]'
           : 'bottom-16 right-4 w-[380px] max-w-[92vw] h-auto'
       } rounded-3xl bg-zinc-950/95 border-2 backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col`}
       style={{
@@ -236,12 +258,12 @@ export const YouTubeCyberPlayer: React.FC = () => {
       <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/90 border-b border-zinc-800 select-none">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg bg-red-600/20 border border-red-500/60 flex items-center justify-center">
-            <Film className="w-4 h-4 text-red-500" />
+            <Music className="w-4 h-4 text-red-500" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold tracking-wider text-white">
-                YOUTUBE CYBER-HUB
+                YOUTUBE MUSIC CYBER-HUB
               </span>
               <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
             </div>
@@ -254,12 +276,12 @@ export const YouTubeCyberPlayer: React.FC = () => {
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 text-zinc-400">
           <button
-            onClick={openYouTubeHome}
-            title="Open YouTube.com Main Portal"
+            onClick={openYouTubeMusic}
+            title="Open YouTube Music Portal"
             className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] text-zinc-300 font-bold flex items-center gap-1 transition-all"
           >
-            <ExternalLink className="w-3 h-3" />
-            <span className="hidden sm:inline">YOUTUBE.COM</span>
+            <Headphones className="w-3 h-3 text-red-400" />
+            <span className="hidden sm:inline">MUSIC.YOUTUBE</span>
           </button>
 
           <button
@@ -267,7 +289,7 @@ export const YouTubeCyberPlayer: React.FC = () => {
             title="Open Current Video in Tab"
             className="p-1.5 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
           >
-            <Tv className="w-3.5 h-3.5" />
+            <ExternalLink className="w-3.5 h-3.5" />
           </button>
 
           <button
@@ -276,7 +298,7 @@ export const YouTubeCyberPlayer: React.FC = () => {
               else if (viewMode === 'theater') setViewMode('fullscreen');
               else setViewMode('compact');
             }}
-            title="Cycle View Size (Compact / Theater / Fullscreen)"
+            title="Toggle View Mode"
             className="p-1.5 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
           >
             {viewMode === 'fullscreen' ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
@@ -294,15 +316,15 @@ export const YouTubeCyberPlayer: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* Left Side: Video Player & Address Bar */}
-        <div className="flex-1 flex flex-col p-3 space-y-3 overflow-y-auto">
-          {/* Universal Address & Search Bar */}
+        {/* Left Side: Video Player & Search Bar */}
+        <div className="flex-1 flex flex-col p-3 space-y-2.5 overflow-y-auto">
+          {/* Universal Search & Link Input */}
           <form onSubmit={handleSearchOrUrlSubmit} className="flex gap-1.5">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
               <input
                 type="text"
-                placeholder="Paste ANY YouTube Link (watch?v=, youtu.be, shorts) or search..."
+                placeholder="Search any Song, Artist, Album, or Paste YouTube URL..."
                 value={urlOrSearchInput}
                 onChange={(e) => setUrlOrSearchInput(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 font-mono"
@@ -310,12 +332,32 @@ export const YouTubeCyberPlayer: React.FC = () => {
             </div>
             <button
               type="submit"
-              className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl flex items-center gap-1 transition-all shadow-md"
+              className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md"
             >
-              <Play className="w-3 h-3 fill-current" />
-              <span>LOAD</span>
+              <Search className="w-3 h-3" />
+              <span>SEARCH MUSIC</span>
             </button>
           </form>
+
+          {/* Quick Search Chips Bar */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none select-none">
+            <span className="text-[10px] text-zinc-500 flex items-center gap-1 shrink-0">
+              <Flame className="w-3 h-3 text-red-500" />
+              TRENDING:
+            </span>
+            {QUICK_MUSIC_SEARCH_PROMPTS.map((prompt, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  setUrlOrSearchInput(prompt);
+                  handleSearchOrUrlSubmit(undefined, prompt);
+                }}
+                className="px-2.5 py-0.5 rounded-full bg-zinc-900/80 border border-zinc-800 hover:border-red-500 text-[10px] text-zinc-300 hover:text-white whitespace-nowrap transition-all"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
 
           {/* Full Embedded YouTube Player */}
           <div className="relative w-full flex-1 min-h-[220px] rounded-2xl overflow-hidden bg-black border border-zinc-800 shadow-2xl">
@@ -330,13 +372,13 @@ export const YouTubeCyberPlayer: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Side: Curated Cyber Feed (Hidden in compact mode) */}
+        {/* Right Side: Curated Cyber Music Feed (Hidden in compact mode) */}
         {viewMode !== 'compact' && (
           <div className="w-full md:w-64 border-t md:border-t-0 md:border-l border-zinc-800/80 p-3 bg-zinc-950/60 flex flex-col space-y-2.5 overflow-y-auto">
             <div className="flex items-center justify-between select-none">
               <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-200">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                <span>CYBER FEED</span>
+                <Disc className="w-3.5 h-3.5 text-red-500 animate-spin" />
+                <span>FEATURED TRACKS</span>
               </div>
               <span className="text-[10px] text-zinc-500 uppercase">1-Click Play</span>
             </div>
@@ -346,9 +388,11 @@ export const YouTubeCyberPlayer: React.FC = () => {
               {[
                 { id: 'all', label: 'All' },
                 { id: 'live', label: '🔴 Live' },
-                { id: 'music', label: '🎵 Music' },
+                { id: 'hindi', label: '🇮🇳 Hindi' },
+                { id: 'rock', label: '⚡ Rock' },
+                { id: 'lofi', label: '☕ Lofi' },
                 { id: 'epic', label: '🌌 Epic' },
-                { id: 'tech', label: '💻 Tech' },
+                { id: 'phonk', label: '🏎️ Phonk' },
               ].map((cat) => (
                 <button
                   key={cat.id}

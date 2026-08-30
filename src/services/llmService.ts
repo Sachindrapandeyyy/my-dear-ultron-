@@ -1,6 +1,8 @@
 ﻿import { ChatMessage, AppSettings, SoulPreset } from '@/types';
 import { voiceActionService } from '@/services/voiceActionService';
 import { ollamaService } from '@/services/ollamaService';
+import { liveApiService } from '@/services/liveApiService';
+import { osService } from '@/services/osService';
 
 export class LLMService {
   async sendMessageStream(
@@ -14,8 +16,9 @@ export class LLMService {
   ): Promise<void> {
     try {
       const lastUserMessage = messages[messages.length - 1]?.content || '';
+      const q = lastUserMessage.toLowerCase();
 
-      // 1. Direct Voice Action Router (Theme switch, Tab switch, Telemetry, Lock, Sentry, Web Opening)
+      // 1. Direct Voice Action Router (Theme switch, Tab switch, Telemetry, Lock, Sentry, YouTube play)
       const actionResult = await voiceActionService.processVoiceCommand(lastUserMessage);
       if (actionResult.handled && actionResult.responseMessage) {
         const text = actionResult.responseMessage;
@@ -24,15 +27,46 @@ export class LLMService {
         return;
       }
 
+      // 2. Real-Time Dynamic Live API Ingestion (RAG)
+      let liveContextPrompt = '';
+
+      // 2a. Live Weather Ingestion
+      if (q.includes('weather') || q.includes('mausam') || q.includes('temperature') || q.includes('forecast')) {
+        const cityMatch = lastUserMessage.match(/weather\s+(?:in|for|at|of)\s+([a-zA-Z\s]+)/i) ||
+                           lastUserMessage.match(/([a-zA-Z\s]+)\s+weather/i) ||
+                           lastUserMessage.match(/mausam\s+(?:kaisa\s+hai\s+in|in)?\s*([a-zA-Z\s]+)/i);
+        const city = cityMatch ? cityMatch[1].trim() : 'Delhi';
+        const weatherData = await liveApiService.getWeather(city);
+        liveContextPrompt += `\n\n[REAL-TIME LIVE WEATHER API DATA (CURRENT)]: \n${weatherData}\n(Instructions: Use this exact live weather data to formulate your spoken answer naturally in character.)`;
+      }
+
+      // 2b. Live News Ingestion
+      if (q.includes('news') || q.includes('headline') || q.includes('samachar') || q.includes('happening')) {
+        const newsData = await liveApiService.getLiveNews();
+        liveContextPrompt += `\n\n[REAL-TIME LIVE WORLD & TECH NEWS API FEED (CURRENT)]: \n${newsData}\n(Instructions: Summarize these top live headlines clearly for the user in character.)`;
+      }
+
+      // 2c. Live Crypto Ingestion
+      if (q.includes('crypto') || q.includes('bitcoin') || q.includes('ethereum') || q.includes('btc') || q.includes('eth')) {
+        const cryptoData = await liveApiService.getCryptoRates();
+        liveContextPrompt += `\n\n[REAL-TIME LIVE CRYPTO MARKET RATES (CURRENT)]: \n${cryptoData}`;
+      }
+
+      // 2d. Live Laptop Telemetry Ingestion
+      if (q.includes('battery') || q.includes('cpu') || q.includes('laptop status') || q.includes('system status')) {
+        const tel = osService.getTelemetry();
+        liveContextPrompt += `\n\n[LIVE LAPTOP HARDWARE TELEMETRY]: CPU: ${tel.cpuUsage}%, RAM: ${tel.memoryUsage}%, Battery: ${tel.batteryLevel}% (${tel.isCharging ? 'Charging' : 'Discharging'})`;
+      }
+
       const memoryPrompt = recalledMemories.length > 0
         ? `\n\n[COLLECTIVE MEMORY RECALL]:\n${recalledMemories.map((m, i) => `${i + 1}. ${m}`).join('\n')}`
         : '';
 
-      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, engineered by Sachindra Pandey for nxt IN Company. Style: ${soul.vibe}]${memoryPrompt}\n[RULES: Answer all questions, math, vision screen inquiries, and code generation requests directly and accurately. Never output raw LaTeX delimiters like $$ or \\text in casual math answers.]`;
+      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, engineered by Sachindra Pandey for nxt IN Company. Style: ${soul.vibe}]${memoryPrompt}${liveContextPrompt}\n[RULES: Answer all questions, live weather queries, news summaries, and code requests directly, accurately, and conversationally. Never say you cannot access live data when the live API data is provided in your context.]`;
 
       const hasValidKey = Boolean(settings.apiKey && settings.apiKey.trim().length > 5);
 
-      // 2. Try Local Ollama First
+      // 3. Try Local Ollama First
       if (settings.llmProvider === 'ollama') {
         try {
           await this.callOllamaStream(messages, systemPrompt, settings, onChunk, onComplete);
@@ -60,8 +94,8 @@ export class LLMService {
         }
       }
 
-      // If Ollama is offline or uninstalled, run built-in Autonomous Total AI Engine
-      await this.runAutonomousIntelligenceEngine(messages, soul, recalledMemories, onChunk, onComplete);
+      // If Ollama is offline, run built-in Autonomous Total AI Engine
+      await this.runAutonomousIntelligenceEngine(messages, soul, recalledMemories, liveContextPrompt, onChunk, onComplete);
     } catch (e: any) {
       onError(e);
     }
@@ -77,11 +111,11 @@ export class LLMService {
     const endpoint = ollamaService.resolveEndpoint(settings.ollamaEndpoint);
     const hasImage = messages.some((m) => Boolean(m.imageUrl));
 
-    let model = settings.modelName || 'llama3.2:latest';
+    let model = settings.modelName || 'nemotron-mini:latest';
     if (model === 'llama3.2') model = 'llama3.2:latest';
     // Auto-select vision model when images are present
     if (hasImage) {
-      model = 'moondream';
+      model = 'moondream:latest';
     }
 
     const formattedMessages = [
@@ -377,6 +411,7 @@ export class LLMService {
     messages: ChatMessage[],
     soul: SoulPreset,
     recalledMemories: string[],
+    liveContextPrompt: string,
     onChunk: (chunk: string) => void,
     onComplete: (fullText: string) => void
   ): Promise<void> {
@@ -389,15 +424,19 @@ export class LLMService {
     const isUltron = soul.id.includes('ultron');
     const prefix = isJarvis ? 'Good day, Sir. ' : isUltron ? '' : '';
 
-    // Handle Screen Vision in Fallback Engine
-    if (lastMsgObj?.imageUrl) {
+    if (liveContextPrompt) {
+      answer = `${prefix}Here is the real-time live data you requested:\n\n${liveContextPrompt.replace(/\[REAL-TIME.*?\]:\s*/g, '').trim()}`;
+    }
+
+    // Handle Screen Vision
+    if (!answer && lastMsgObj?.imageUrl) {
       answer = `${prefix}I have inspected your desktop screen capture.\n\n` +
         `• **Screen Status**: Active window frame captured and processed.\n` +
         `• **Visual Diagnostics**: Interface layout, active browser tabs, and desktop workspace are operational.\n` +
         `• **Action**: If you need me to debug code or summarize visible text on your screen, specify your target directive.`;
     }
 
-    // 1. Math Evaluator
+    // Math Evaluator
     if (!answer) {
       const simpleMathMatch = rawMsg.match(/(\d+(?:\.\d+)?)\s*([\+\-\*\/xX])\s*(\d+(?:\.\d+)?)/);
       if (simpleMathMatch) {
