@@ -69,11 +69,7 @@ class VoiceActionService {
 
     // 1. Live Weather API Tool
     if (raw.includes('weather') || raw.includes('mausam') || raw.includes('temperature') || raw.includes('forecast')) {
-      const cityMatch = raw.match(/weather\s+(?:in|for|at|of)\s+([a-zA-Z\s]+)/i) ||
-                         raw.match(/([a-zA-Z\s]+)\s+weather/i) ||
-                         raw.match(/mausam\s+(?:kaisa\s+hai\s+in|in)?\s*([a-zA-Z\s]+)/i);
-      const city = cityMatch ? cityMatch[1].trim() : 'Delhi';
-      const weatherReport = await liveApiService.getWeather(city);
+      const weatherReport = await liveApiService.getWeather(input);
       return {
         handled: true,
         responseMessage: weatherReport,
@@ -236,7 +232,18 @@ class VoiceActionService {
     }
 
     // 9. Navigation & UI Tab Switching by Voice
-    if (raw.includes('open swarm') || raw.includes('show swarm') || raw.includes('go to swarm') || raw.includes('subagents') || raw.includes('multi agent') || raw.includes('swarm hub')) {
+    if (
+      raw.includes('open swarm') ||
+      raw.includes('show swarm') ||
+      raw.includes('go to swarm') ||
+      raw.includes('subagents') ||
+      raw.includes('sub agents') ||
+      raw.includes('sab agents') ||
+      raw.includes('sab agent') ||
+      raw.includes('multi agent') ||
+      raw.includes('all agents') ||
+      raw.includes('swarm hub')
+    ) {
       setActiveTab('swarm');
       return { handled: true, responseMessage: 'Accessing Autonomous AI Subagent Swarm Mission Control.' };
     }
@@ -291,24 +298,45 @@ class VoiceActionService {
       }
     }
 
-    // 11. Battery & Laptop Telemetry by Voice
-    if (raw.includes('check battery') || raw.includes('battery level') || raw.includes('battery status')) {
+    // 11. Battery & Charger Telemetry by Voice
+    if (
+      raw.includes('battery') ||
+      raw.includes('charger') ||
+      raw.includes('percentage of the charger') ||
+      raw.includes('charging') ||
+      raw.includes('battery status') ||
+      raw.includes('battery level')
+    ) {
       const tel = osService.getTelemetry();
-      const statusStr = tel.isCharging ? 'and charging on AC power' : 'running on battery';
+      const statusStr = tel.isCharging ? 'and currently charging on AC power' : 'running on internal battery power';
       return {
         handled: true,
-        responseMessage: `Your laptop battery is currently at ${tel.batteryLevel} percent ${statusStr}.`,
-      };
-    }
-    if (raw.includes('check cpu') || raw.includes('check ram') || raw.includes('system status') || raw.includes('laptop status')) {
-      const tel = osService.getTelemetry();
-      return {
-        handled: true,
-        responseMessage: `System diagnosis: CPU utilization is at ${tel.cpuUsage} percent, RAM heap is at ${tel.memoryUsage} percent, and battery is at ${tel.batteryLevel} percent.`,
+        responseMessage: `Laptop battery is currently at ${tel.batteryLevel} percent (${statusStr}).`,
       };
     }
 
-    // 12. Clear Logs / Purge by Voice
+    // 12. Full System Diagnostic Scan & Telemetry
+    if (
+      raw.includes('scan the system') ||
+      raw.includes('system telemetry scan') ||
+      raw.includes('scan system') ||
+      raw.includes('system scan') ||
+      raw.includes('diagnostics') ||
+      raw === 'what is the status' ||
+      raw === 'status' ||
+      raw.includes('system status') ||
+      raw.includes('laptop status') ||
+      raw.includes('check cpu') ||
+      raw.includes('check ram')
+    ) {
+      const tel = osService.getTelemetry();
+      return {
+        handled: true,
+        responseMessage: `System Diagnostics Complete: Platform is ${tel.platform} (${tel.osVersion}). CPU load is at ${tel.cpuUsage} percent, RAM heap utilization is at ${tel.memoryUsage} percent, and battery level is at ${tel.batteryLevel} percent with ${tel.latencyMs} millisecond network latency. All core neural channels nominal.`,
+      };
+    }
+
+    // 13. Clear Logs / Purge by Voice
     if (raw.includes('clear chat') || raw.includes('purge chat') || raw.includes('clear screen') || raw.includes('reset chat')) {
       clearMessages();
       return { handled: true, responseMessage: 'Chat history and buffers cleared.' };

@@ -1,4 +1,4 @@
-﻿import { ChatMessage, AppSettings, SoulPreset } from '@/types';
+import { ChatMessage, AppSettings, SoulPreset } from '@/types';
 import { voiceActionService } from '@/services/voiceActionService';
 import { ollamaService } from '@/services/ollamaService';
 import { liveApiService } from '@/services/liveApiService';
@@ -32,11 +32,7 @@ export class LLMService {
 
       // 2a. Live Weather Ingestion
       if (q.includes('weather') || q.includes('mausam') || q.includes('temperature') || q.includes('forecast')) {
-        const cityMatch = lastUserMessage.match(/weather\s+(?:in|for|at|of)\s+([a-zA-Z\s]+)/i) ||
-                           lastUserMessage.match(/([a-zA-Z\s]+)\s+weather/i) ||
-                           lastUserMessage.match(/mausam\s+(?:kaisa\s+hai\s+in|in)?\s*([a-zA-Z\s]+)/i);
-        const city = cityMatch ? cityMatch[1].trim() : 'Delhi';
-        const weatherData = await liveApiService.getWeather(city);
+        const weatherData = await liveApiService.getWeather(lastUserMessage);
         liveContextPrompt += `\n\n[REAL-TIME LIVE WEATHER API DATA (CURRENT)]: \n${weatherData}\n(Instructions: Use this exact live weather data to formulate your spoken answer naturally in character.)`;
       }
 
@@ -109,12 +105,14 @@ export class LLMService {
     onComplete: (fullText: string) => void
   ): Promise<void> {
     const endpoint = ollamaService.resolveEndpoint(settings.ollamaEndpoint);
-    const hasImage = messages.some((m) => Boolean(m.imageUrl));
+    const lastMessage = messages[messages.length - 1];
+    const hasImageInActiveQuery = Boolean(lastMessage?.imageUrl);
 
     let model = settings.modelName || 'nemotron-mini:latest';
     if (model === 'llama3.2') model = 'llama3.2:latest';
-    // Auto-select vision model when images are present
-    if (hasImage) {
+    
+    // ONLY switch to vision model if the current query specifically contains an image
+    if (hasImageInActiveQuery) {
       model = 'moondream:latest';
     }
 
@@ -123,8 +121,8 @@ export class LLMService {
       ...messages
         .filter((m) => m.role !== 'system')
         .map((m) => {
-          const msgObj: any = { role: m.role, content: m.content || 'Analyze this image.' };
-          if (m.imageUrl) {
+          const msgObj: any = { role: m.role, content: m.content || 'Process directive.' };
+          if (m.imageUrl && hasImageInActiveQuery) {
             const rawBase64 = m.imageUrl.replace(/^data:image\/[a-z]+;base64,/, '');
             msgObj.images = [rawBase64];
           }

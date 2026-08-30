@@ -18,6 +18,9 @@ export interface NewsArticle {
 const CITY_COORDINATES: Record<string, { lat: number; lon: number; name: string }> = {
   delhi: { lat: 28.6139, lon: 77.2090, name: 'Delhi, India' },
   newdelhi: { lat: 28.6139, lon: 77.2090, name: 'New Delhi, India' },
+  varanasi: { lat: 25.3176, lon: 82.9739, name: 'Varanasi, Uttar Pradesh, India' },
+  banaras: { lat: 25.3176, lon: 82.9739, name: 'Varanasi, Uttar Pradesh, India' },
+  kashi: { lat: 25.3176, lon: 82.9739, name: 'Varanasi, Uttar Pradesh, India' },
   mumbai: { lat: 19.0760, lon: 72.8777, name: 'Mumbai, India' },
   bengaluru: { lat: 12.9716, lon: 77.5946, name: 'Bengaluru, India' },
   bangalore: { lat: 12.9716, lon: 77.5946, name: 'Bengaluru, India' },
@@ -28,6 +31,17 @@ const CITY_COORDINATES: Record<string, { lat: number; lon: number; name: string 
   ahmedabad: { lat: 23.0225, lon: 72.5714, name: 'Ahmedabad, India' },
   jaipur: { lat: 26.9124, lon: 75.7873, name: 'Jaipur, India' },
   lucknow: { lat: 26.8467, lon: 80.9462, name: 'Lucknow, India' },
+  kanpur: { lat: 26.4499, lon: 80.3319, name: 'Kanpur, India' },
+  noida: { lat: 28.5355, lon: 77.3910, name: 'Noida, India' },
+  gurgaon: { lat: 28.4595, lon: 77.0266, name: 'Gurugram, India' },
+  gurugram: { lat: 28.4595, lon: 77.0266, name: 'Gurugram, India' },
+  patna: { lat: 25.5941, lon: 85.1376, name: 'Patna, India' },
+  bhopal: { lat: 23.2599, lon: 77.4126, name: 'Bhopal, India' },
+  indore: { lat: 22.7196, lon: 75.8577, name: 'Indore, India' },
+  chandigarh: { lat: 30.7333, lon: 76.7794, name: 'Chandigarh, India' },
+  agra: { lat: 27.1767, lon: 78.0081, name: 'Agra, India' },
+  prayagraj: { lat: 25.4358, lon: 81.8463, name: 'Prayagraj, India' },
+  allahabad: { lat: 25.4358, lon: 81.8463, name: 'Prayagraj, India' },
   london: { lat: 51.5074, lon: -0.1278, name: 'London, UK' },
   newyork: { lat: 40.7128, lon: -74.0060, name: 'New York, USA' },
   tokyo: { lat: 35.6762, lon: 139.6503, name: 'Tokyo, Japan' },
@@ -37,10 +51,45 @@ const CITY_COORDINATES: Record<string, { lat: number; lon: number; name: string 
 };
 
 class LiveApiService {
+  // Extract Target City from anywhere in the user query
+  extractCity(query: string): string {
+    const raw = query.toLowerCase();
+
+    // 1. Direct dictionary check
+    for (const cityKey of Object.keys(CITY_COORDINATES)) {
+      if (raw.includes(cityKey)) {
+        return cityKey.charAt(0).toUpperCase() + cityKey.slice(1);
+      }
+    }
+
+    // 2. Regex pattern checks
+    const patterns = [
+      /(?:location|city)\s+(?:is|of|for|in)\s+([a-zA-Z\s]+)/i,
+      /weather\s+(?:in|for|at|of|is)\s+([a-zA-Z\s]+)/i,
+      /temperature\s+(?:in|for|at|of|is)\s+([a-zA-Z\s]+)/i,
+      /mausam\s+(?:in|kaisa\s+hai\s+in|hai\s+in)\s+([a-zA-Z\s]+)/i,
+      /([a-zA-Z]+)\s+ka\s+mausam/i,
+      /([a-zA-Z]+)\s+(?:weather|temperature|forecast)/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = query.match(pattern);
+      if (match && match[1]) {
+        const candidate = match[1].trim().replace(/[?!.,]/g, '');
+        if (candidate.length > 2 && !['the', 'today', 'now', 'live', 'status'].includes(candidate.toLowerCase())) {
+          return candidate;
+        }
+      }
+    }
+
+    return 'Delhi';
+  }
+
   // 1. Fetch Real-Time Weather from Open-Meteo
   async getWeather(cityQuery = 'Delhi'): Promise<string> {
     try {
-      const cleanCityKey = cityQuery.toLowerCase().replace(/[^a-z]/g, '');
+      const resolvedCity = this.extractCity(cityQuery);
+      const cleanCityKey = resolvedCity.toLowerCase().replace(/[^a-z]/g, '');
       let lat = 28.6139;
       let lon = 77.2090;
       let cityName = `${cityQuery}, India`;
