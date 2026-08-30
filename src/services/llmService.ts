@@ -1,4 +1,5 @@
-import { ChatMessage, AppSettings, SoulPreset } from '@/types';
+﻿import { ChatMessage, AppSettings, SoulPreset } from '@/types';
+import { voiceActionService } from '@/services/voiceActionService';
 
 export class LLMService {
   async sendMessageStream(
@@ -11,11 +12,22 @@ export class LLMService {
     onError: (err: Error) => void
   ): Promise<void> {
     try {
+      const lastUserMessage = messages[messages.length - 1]?.content || '';
+
+      // 1. Check for Direct Voice Action Commands (Theme switch, Tab switch, Telemetry, etc.)
+      const actionResult = await voiceActionService.processVoiceCommand(lastUserMessage);
+      if (actionResult.handled && actionResult.responseMessage) {
+        const text = actionResult.responseMessage;
+        onChunk(text);
+        onComplete(text);
+        return;
+      }
+
       const memoryPrompt = recalledMemories.length > 0
         ? `\n\n[COLLECTIVE MEMORY RECALL]:\n${recalledMemories.map((m, i) => `${i + 1}. ${m}`).join('\n')}`
         : '';
 
-      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}. Style: ${soul.vibe}]${memoryPrompt}\n[RULES: Be concise, precise, intelligent, futuristic, and helpful. You control a laptop desktop environment.]`;
+      const systemPrompt = `${soul.systemPrompt}\n\n[IDENTITY: You are ${soul.name}, engineered by Sachindra Pandey for nxt IN Company. Style: ${soul.vibe}]${memoryPrompt}\n[RULES: Be concise, precise, intelligent, futuristic, and helpful. Never output raw LaTeX delimiters like $$ or \\text in casual math answers.]`;
 
       const hasValidKey = Boolean(settings.apiKey && settings.apiKey.trim().length > 5);
 
@@ -24,7 +36,7 @@ export class LLMService {
           await this.callOllamaStream(messages, systemPrompt, settings, onChunk, onComplete);
           return;
         } catch (err: any) {
-          // If Ollama is starting up or temporarily offline, fall back to autonomous intelligence engine
+          // If Ollama is starting or offline, use autonomous intelligence engine
         }
       } else if (hasValidKey) {
         if (settings.llmProvider === 'gemini') {
@@ -356,8 +368,7 @@ export class LLMService {
     const isUltron = soul.id.includes('ultron');
     const prefix = isJarvis ? 'Good day, Sir. ' : isUltron ? '' : '';
 
-    // 1. Exact Math / Arithmetic Evaluator
-    const mathMatch = rawMsg.match(/(?:what\s+is|calculate|evaluate|solve)?\s*([0-9\.\s\+\-\*\/\^\(\)\%]+)/i);
+    // 1. Clean Math & Arithmetic Evaluator (No LaTeX $$ signs)
     const hasOperators = /[\+\-\*\/]/.test(rawMsg);
     if (hasOperators) {
       try {
@@ -371,14 +382,13 @@ export class LLMService {
           .trim();
 
         if (/^[0-9\.\s\+\-\*\/\(\)\%]+$/.test(cleanExpr)) {
-          // Safe eval using Function constructor
           const result = new Function(`'use strict'; return (${cleanExpr})`)();
           if (typeof result === 'number' && !isNaN(result)) {
             answer = isJarvis
-              ? `The answer is **${result}**, Sir. \n\n$$\\text{Calculation: } ${cleanExpr} = ${result}$$`
+              ? `The answer is ${result}, Sir. (${cleanExpr} = ${result})`
               : isUltron
-              ? `The result is **${result}**.\n\n$$\\text{Computed: } ${cleanExpr} = ${result}$$`
-              : `**${cleanExpr} = ${result}**`;
+              ? `The result is ${result}. Calculation: ${cleanExpr} = ${result}`
+              : `${cleanExpr} = ${result}`;
           }
         }
       } catch {}
@@ -461,39 +471,38 @@ export class LLMService {
     if (!answer) {
       if (q.includes('battery') || q.includes('cpu') || q.includes('telemetry') || q.includes('system') || q.includes('specs') || q.includes('status')) {
         answer = `${prefix}Here is your live laptop telemetry diagnosis:\n\n` +
-          `• **Holographic Orb Matrix**: 60 FPS WebGL2 Render Online\n` +
-          `• **Gesture Engine**: MediaPipe Tasks Vision Active\n` +
-          `• **Voice Engine**: Movie-Grade Real-Time Synthesizer Active\n` +
-          `• **Memory Bank**: Active (${recalledMemories.length} memories recalled)\n` +
-          `• **Active Persona**: ${soul.name} ${soul.emoji}`;
+          `• Holographic Orb Matrix: 60 FPS WebGL2 Render Online\n` +
+          `• Gesture Engine: MediaPipe Vision Active\n` +
+          `• Voice Engine: Movie-Grade Real-Time Synthesizer Active\n` +
+          `• Memory Bank: Active (${recalledMemories.length} memories recalled)\n` +
+          `• Active Persona: ${soul.name} ${soul.emoji}`;
       }
     }
 
     // 4. General Knowledge & Definitions
     if (!answer) {
-      if (q.includes('who are you') || q.includes('your name') || q.includes('identity')) {
-        answer = `I am **${soul.name}**, your autonomous desktop intelligence core. I combine ModelScope's self-evolving collective memory, Sagar's 3D holographic gesture orb, and real-time voice synthesis to operate as your complete desktop AI assistant.`;
+      if (q.includes('who are you') || q.includes('your name') || q.includes('who made you') || q.includes('creator') || q.includes('identity')) {
+        answer = `I am **${soul.name}**, an autonomous desktop AI assistant created and engineered by **Sachindra Pandey for nxt IN Company**. I combine spatial 3D holographic rendering, persistent collective memory, and real-time voice controls to assist you across your desktop.`;
       } else if (q.includes('gravity') || q.includes('physics')) {
-        answer = `${prefix}Gravity is a fundamental natural phenomenon by which all things with mass or energy are attracted toward one another. In Einstein's General Relativity, gravity is not a traditional force, but a curvature of spacetime caused by mass and energy ($G_{\\mu\\nu} = \\frac{8\\pi G}{c^4} T_{\\mu\\nu}$).`;
+        answer = `${prefix}Gravity is a fundamental natural force by which all objects with mass or energy are drawn toward one another. In Einstein's General Relativity, gravity is described as the curvature of spacetime caused by mass and energy.`;
       } else if (q.includes('ai') || q.includes('machine learning') || q.includes('neural')) {
-        answer = `${prefix}Artificial Intelligence encompasses computer systems designed to perform tasks typically requiring human intelligence—including visual perception, speech recognition, decision-making, and autonomous problem solving. In our architecture, we unite spatial computing with persistent collective memory banks.`;
+        answer = `${prefix}Artificial Intelligence represents computing systems capable of learning, reasoning, perception, and problem solving. Ultron unifies spatial 3D interfaces with local neural models and persistent memory.`;
       } else if (q.includes('joke') || q.includes('funny')) {
         answer = isJarvis
           ? `Why do programmers prefer dark mode, Sir? Because light attracts bugs.`
           : `Why do computers always eat their snacks? Because they have byte-sized chips.`;
       } else if (q.includes('help') || q.includes('features') || q.includes('what can you do')) {
-        answer = `🔮 **Ultron Desktop Total AI Capabilities**:\n` +
-          `1. **Full Conversational Reasoning**: Ask any question (math, science, coding, analysis) and receive precise answers.\n` +
-          `2. **Voice Generation & Speech**: Talk hands-free and hear movie-grade synthetic voice responses.\n` +
-          `3. **Hand Gesture Control**: Control the 3D Orb with webcam hand pinches and spreads.\n` +
-          `4. **ModelScope Memory Hub**: Retains knowledge, patterns, and bug fixes across all sessions.\n` +
-          `5. **Local Ollama & Cloud LLMs**: 100% offline local model execution or cloud API routing.`;
+        answer = `🔮 **Ultron Desktop Capabilities**:\n` +
+          `1. Full Voice Control: Say "change color to blue", "open terminal", or "check battery" to control the app.\n` +
+          `2. Hands-Free Speech: Talk hands-free and hear movie-grade natural voice responses.\n` +
+          `3. 3D Holographic Orb: Control with webcam hand gestures or mouse touch.\n` +
+          `4. ModelScope Memory: Persistent collective memory indexing your preferences.\n` +
+          `5. Local Ollama AI: 100% offline privacy and reasoning right on your laptop.`;
       } else if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
         answer = `${prefix}Greetings. **${soul.name}** neural matrix is fully synchronized. How may I assist your engineering and computing tasks today?`;
       } else {
-        // Universal Intelligent Direct Responder
         answer = `${prefix}Regarding "${rawMsg.trim()}":\n\n` +
-          `The parameters have been processed by the **${soul.name}** neural matrix. All relevant local memory channels are aligned. If you require calculations, code synthesis, document breakdown, or system automation, specify your target parameters and I will execute immediately.`;
+          `The query has been analyzed. If you would like me to perform math calculations, generate code, switch themes, or run system diagnostics, simply give the command.`;
       }
     }
 

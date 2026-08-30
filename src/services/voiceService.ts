@@ -63,7 +63,6 @@ class VoiceService {
   private isListening = false;
   private isSpeaking = false;
   private voices: SpeechSynthesisVoice[] = [];
-  private utteranceQueue: SpeechSynthesisUtterance[] = [];
 
   constructor() {
     this.initRecognition();
@@ -161,7 +160,35 @@ class VoiceService {
     }
   }
 
-  // Movie-grade speech synthesis with natural pacing and markdown cleaning
+  /**
+   * Sanitizes text for crystal clear movie-grade voice output:
+   * Strips all LaTeX symbols ($$, \\text, \\frac), asterisks, hashes, backticks, emojis, URLs.
+   */
+  sanitizeForSpeech(text: string): string {
+    return text
+      // Remove code blocks
+      .replace(/```[\s\S]*?```/g, 'Code block details displayed on screen.')
+      .replace(/`([^`]+)`/g, '$1')
+      // Remove LaTeX / KaTeX math blocks
+      .replace(/\$\$[\s\S]*?\$\$/g, '')
+      .replace(/\$[^$]*\$/g, '')
+      .replace(/\\text\{([^}]+)\}/g, '$1')
+      .replace(/\\[a-zA-Z]+/g, '')
+      // Remove markdown links & images
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/\[.*?\]/g, '')
+      // Remove symbols, hashes, stars, underscores
+      .replace(/[#*~_]/g, '')
+      .replace(/[-*•]\s+/g, '')
+      .replace(/https?:\/\/\S+/g, '')
+      // Remove emojis
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
+      .replace(/[\u{2600}-\u{26FF}]/gu, '')
+      // Normalize whitespace
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   speak(
     text: string,
     options?: {
@@ -178,26 +205,12 @@ class VoiceService {
 
     this.stopSpeaking();
 
-    // Comprehensive Movie AI Speech Sanitizer:
-    // Strips code blocks, markdown brackets, bullets, emojis, and noisy symbols
-    const cleanText = text
-      .replace(/```[\s\S]*?```/g, 'Code block details displayed on your screen.')
-      .replace(/`([^`]+)`/g, '$1')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/\[.*?\]/g, '')
-      .replace(/[#*~_]/g, '')
-      .replace(/[-*•]\s+/g, '')
-      .replace(/https?:\/\/\S+/g, 'link')
-      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // strip emojis so speech engine doesn't stutter
-      .replace(/[\u{2600}-\u{26FF}]/gu, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
+    const cleanText = this.sanitizeForSpeech(text);
     if (!cleanText) return;
 
     const presetConfig = options?.preset ? VOICE_PERSONA_PRESETS[options.preset] : VOICE_PERSONA_PRESETS['jarvis'];
 
-    // Select optimal natural voice
+    // Find best matching voice
     let matchedVoice: SpeechSynthesisVoice | undefined;
     const enVoices = this.voices.filter((v) => v.lang.startsWith('en'));
 
