@@ -20,6 +20,8 @@ import {
   Copy,
   Check,
   ExternalLink,
+  ShieldAlert,
+  Lock as LockIcon,
 } from 'lucide-react';
 import { audioService } from '@/services/audioService';
 import { ollamaService, OllamaStatus } from '@/services/ollamaService';
@@ -185,8 +187,41 @@ export const HeaderHUD: React.FC = () => {
           })}
         </nav>
 
-        {/* Right: Phone Sync, Telemetry & Themes */}
-        <div className="flex items-center gap-3">
+        {/* Right: Security, Phone Sync, Telemetry & Themes */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Sentry Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              if (settings.soundEffects) audioService.playClickSound();
+              const next = !useAppStore.getState().isSentryActive;
+              useAppStore.getState().setIsSentryActive(next);
+            }}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded border text-xs font-mono transition-all ${
+              useAppStore.getState().isSentryActive
+                ? 'bg-red-950/80 border-red-500 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.4)] animate-pulse'
+                : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-400'
+            }`}
+            title="Toggle Sentry Surveillance Guard Mode"
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">SENTRY</span>
+          </button>
+
+          {/* Biometric Lock Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (settings.soundEffects) audioService.playClickSound();
+              useAppStore.getState().setIsLocked(true);
+            }}
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-amber-400 text-xs font-mono transition-all"
+            title="Lock Desktop with Biometric Face ID (Ctrl+L)"
+          >
+            <LockIcon className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">LOCK</span>
+          </button>
+
           {/* Phone Sync Button */}
           <button
             type="button"

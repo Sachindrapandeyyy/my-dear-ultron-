@@ -57,6 +57,15 @@ interface AppState {
   skills: SkillItem[];
   toggleSkill: (id: string) => void;
 
+  isLocked: boolean;
+  setIsLocked: (locked: boolean) => void;
+
+  isSentryActive: boolean;
+  setIsSentryActive: (active: boolean) => void;
+
+  isEnrollModalOpen: boolean;
+  setIsEnrollModalOpen: (open: boolean) => void;
+
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
 
@@ -136,6 +145,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       skills: state.skills.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s)),
     })),
+
+  isLocked: false,
+  setIsLocked: (locked) => set({ isLocked: locked }),
+
+  isSentryActive: false,
+  setIsSentryActive: (active) => set({ isSentryActive: active }),
+
+  isEnrollModalOpen: false,
+  setIsEnrollModalOpen: (open) => set({ isEnrollModalOpen: open }),
 
   settings: {
     llmProvider: 'ollama',

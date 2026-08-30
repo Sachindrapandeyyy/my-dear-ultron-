@@ -1,4 +1,4 @@
-﻿import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '@/store/useAppStore';
 import { OrbTheme } from '@/types';
 import { soulService } from '@/services/soulService';
 import { osService } from '@/services/osService';
@@ -16,6 +16,24 @@ class VoiceActionService {
   async processVoiceCommand(input: string): Promise<VoiceActionResult> {
     const raw = input.trim().toLowerCase();
     const { setTheme, setActiveTab, setActiveSoul, clearMessages, telemetry } = useAppStore.getState();
+
+    // 0. Biometric Security & Sentry Voice Commands
+    if (raw.includes('lock system') || raw.includes('lock screen') || raw.includes('lock desktop') || raw.includes('secure desktop')) {
+      useAppStore.getState().setIsLocked(true);
+      return { handled: true, responseMessage: 'Biometric Face ID lock matrix engaged. Desktop secured.' };
+    }
+    if (raw.includes('enable sentry') || raw.includes('activate sentry') || raw.includes('guard mode on') || raw.includes('start sentry')) {
+      useAppStore.getState().setIsSentryActive(true);
+      return { handled: true, responseMessage: 'Sentry surveillance guard activated. Monitoring unauthorized entities.' };
+    }
+    if (raw.includes('disable sentry') || raw.includes('deactivate sentry') || raw.includes('guard mode off') || raw.includes('stop sentry')) {
+      useAppStore.getState().setIsSentryActive(false);
+      return { handled: true, responseMessage: 'Sentry surveillance guard deactivated.' };
+    }
+    if (raw.includes('enroll face') || raw.includes('register face') || raw.includes('face password') || raw.includes('setup face id')) {
+      useAppStore.getState().setIsEnrollModalOpen(true);
+      return { handled: true, responseMessage: 'Opening Biometric Face ID Enrollment Scanner.' };
+    }
 
     // 1. Orb Color & Theme Voice Commands
     if (

@@ -9,10 +9,12 @@ import { SkillHub } from '@/components/skills/SkillHub';
 import { HarnessSelector } from '@/components/harness/HarnessSelector';
 import { SettingsModal } from '@/components/settings/SettingsModal';
 import { InteractiveTerminal } from '@/components/terminal/InteractiveTerminal';
+import { FaceLockScreen } from '@/components/security/FaceLockScreen';
+import { FaceEnrollModal } from '@/components/security/FaceEnrollModal';
 import { audioService } from '@/services/audioService';
 
 export const App: React.FC = () => {
-  const { activeTab, setActiveTab, settings, updateSettings } = useAppStore();
+  const { activeTab, setActiveTab, settings, updateSettings, isLocked, setIsLocked, isEnrollModalOpen } = useAppStore();
 
   // Load saved settings from local storage on startup
   useEffect(() => {
@@ -33,10 +35,16 @@ export const App: React.FC = () => {
         if (settings.soundEffects) audioService.playClickSound();
         setActiveTab(activeTab === 'chat' ? 'orb' : 'chat');
       }
+      // Ctrl + L -> Lock Screen
+      if (e.ctrlKey && (e.key === 'l' || e.key === 'L')) {
+        e.preventDefault();
+        if (settings.soundEffects) audioService.playClickSound();
+        setIsLocked(true);
+      }
     };
     window.addEventListener('keydown', handleGlobalKey);
     return () => window.removeEventListener('keydown', handleGlobalKey);
-  }, [activeTab, setActiveTab, settings.soundEffects]);
+  }, [activeTab, setActiveTab, settings.soundEffects, setIsLocked]);
 
   return (
     <div className="relative w-screen h-screen bg-black text-white overflow-hidden select-none font-mono">
@@ -69,6 +77,12 @@ export const App: React.FC = () => {
 
       {/* Bottom Voice & Screen Vision Floating Assistant Controls */}
       <VoiceControls />
+
+      {/* Biometric Face ID Lock Barrier */}
+      {isLocked && <FaceLockScreen />}
+
+      {/* Biometric Face ID Enrollment Modal */}
+      {isEnrollModalOpen && <FaceEnrollModal />}
     </div>
   );
 };

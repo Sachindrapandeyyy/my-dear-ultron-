@@ -116,6 +116,24 @@ class AudioService {
       });
     } catch {}
   }
+
+  playWarningSiren(): void {
+    try {
+      const ctx = this.initCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(300, ctx.currentTime + 0.2);
+      osc.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.4);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.45);
+    } catch {}
+  }
 }
 
 export const audioService = new AudioService();
