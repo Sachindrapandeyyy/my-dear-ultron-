@@ -142,21 +142,20 @@ class LiveApiService {
       };
 
       const condition = codeMap[current.weather_code] || 'Clear skies';
+      const tempC = Number(current.temperature_2m).toFixed(1);
+      const tempF = Math.round((Number(current.temperature_2m) * 9) / 5 + 32);
+      const feelsC = Number(current.apparent_temperature).toFixed(1);
 
       return `[LIVE WEATHER TELEMETRY]:
 • Location: ${cityName}
-• Current Temperature: ${current.temperature_2m}°C
-• Feels Like (Heat Index): ${current.apparent_temperature}°C
+• Current Temperature: ${tempC}°C (${tempF}°F)
+• Feels Like: ${feelsC}°C (Humidity/Heat Index)
 • Relative Humidity: ${current.relative_humidity_2m}%
 • Wind Speed: ${current.wind_speed_10m} km/h
 • Sky Condition: ${condition}
-• Precipitation: ${current.precipitation} mm`;
-    } catch {
-      return `[LIVE WEATHER TELEMETRY]:
-• Location: ${cityQuery}
-• Temperature: 33°C (Feels like 37°C)
-• Condition: Clear sunny skies with warm afternoon breeze
-• Humidity: 52%`;
+• Precipitation: ${current.precipitation || 0} mm`;
+    } catch (e: any) {
+      return `[WEATHER API]: Live satellite telemetry for "${cityQuery}" is currently unavailable.`;
     }
   }
 
