@@ -45,19 +45,35 @@ export const BUILTIN_SKILLS: SkillItem[] = [
 
 class OSService {
   private telemetry: SystemTelemetry = {
-    cpuUsage: 14,
-    memoryUsage: 42,
-    batteryLevel: 95,
-    isCharging: true,
-    latencyMs: 18,
+    cpuUsage: 18,
+    memoryUsage: 38,
+    batteryLevel: 30,
+    isCharging: false,
+    latencyMs: 12,
     platform: 'Windows 11',
     osVersion: 'x64 Desktop',
   };
 
   constructor() {
+    this.fetchRealTelemetry();
     this.initBattery();
     this.initPlatform();
-    this.startLatencyLoop();
+    this.startTelemetryLoop();
+  }
+
+  private async fetchRealTelemetry() {
+    try {
+      const res = await fetch('/api/telemetry');
+      if (res.ok) {
+        const data = await res.json();
+        this.telemetry.cpuUsage = data.cpuUsage ?? this.telemetry.cpuUsage;
+        this.telemetry.memoryUsage = data.memoryUsage ?? this.telemetry.memoryUsage;
+        this.telemetry.batteryLevel = data.batteryLevel ?? this.telemetry.batteryLevel;
+        this.telemetry.isCharging = data.isCharging ?? this.telemetry.isCharging;
+        this.telemetry.platform = data.platform ?? this.telemetry.platform;
+        this.telemetry.osVersion = data.osVersion ?? this.telemetry.osVersion;
+      }
+    } catch {}
   }
 
   private async initBattery() {
@@ -85,23 +101,19 @@ class OSService {
     }
   }
 
-  private startLatencyLoop() {
+  private startTelemetryLoop() {
+    // Poll real Windows hardware telemetry every 2.5 seconds
     setInterval(async () => {
+      await this.fetchRealTelemetry();
+
       const start = performance.now();
       try {
         await fetch('https://www.google.com/favicon.ico', { mode: 'no-cors', cache: 'no-store' });
         this.telemetry.latencyMs = Math.round(performance.now() - start);
       } catch {
-        this.telemetry.latencyMs = Math.floor(15 + Math.random() * 12);
+        this.telemetry.latencyMs = 14;
       }
-
-      // Simulate realistic laptop CPU fluctuation
-      this.telemetry.cpuUsage = Math.floor(10 + Math.random() * 22);
-      if ((performance as any).memory) {
-        const mem = (performance as any).memory;
-        this.telemetry.memoryUsage = Math.round((mem.usedJSHeapSize / mem.jsHeapSizeLimit) * 100);
-      }
-    }, 4000);
+    }, 2500);
   }
 
   getTelemetry(): SystemTelemetry {

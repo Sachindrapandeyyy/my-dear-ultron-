@@ -64,7 +64,8 @@ export class LLMService {
 1. Comprehensive & Structured: Never provide lazy or cut-off 1-sentence answers. Structure your responses with clear markdown headers (###), bullet points, and numbered lists where appropriate.
 2. Code Generation: Provide complete, runnable, production-quality code blocks with language tags (e.g. \`\`\`java, \`\`\`python) with clear line-by-line explanations and usage examples.
 3. Natural Language Mirroring: If the user speaks in Hindi, respond in rich, respectful Devanagari Hindi. If the user speaks in Hinglish, respond in warm, fluent, brotherly Hinglish. If in English, respond with world-class engineering clarity.
-4. Direct Execution: Never ask the user to "dictate text" or repeat themselves. Always fulfill the user's intent directly and comprehensively.`;
+4. Direct Execution: Never ask the user to "dictate text" or repeat themselves. Always fulfill the user's intent directly and comprehensively.
+5. Conversational Fluency: NEVER start your responses with "**ULTRON ONLINE**" or repeat robotic matrix initialization phrases. Always speak directly and naturally.`;
 
       const hasValidKey = Boolean(settings.apiKey && settings.apiKey.trim().length > 5);
 
@@ -126,13 +127,17 @@ export class LLMService {
       model = 'moondream:latest';
     }
 
+    const realHistory = messages.filter(
+      (m) => m.role !== 'system' && m.id !== 'welcome-1' && m.content.trim().length > 0
+    );
+
     const formattedMessages = [
       { role: 'system', content: systemPrompt },
-      ...messages
-        .slice(-12) // Keep last 12 rich conversation turns for full context window
-        .filter((m) => m.role !== 'system')
+      ...realHistory
+        .slice(-10) // Keep last 10 real conversation turns
         .map((m) => {
-          const msgObj: any = { role: m.role, content: m.content || 'Process directive.' };
+          const cleanContent = m.content.replace(/^\*\*ULTRON ONLINE\*\*\.?\s*/i, '').trim() || m.content;
+          const msgObj: any = { role: m.role, content: cleanContent || 'Process directive.' };
           if (m.imageUrl && hasImageInActiveQuery) {
             const rawBase64 = m.imageUrl.replace(/^data:image\/[a-z]+;base64,/, '');
             msgObj.images = [rawBase64];

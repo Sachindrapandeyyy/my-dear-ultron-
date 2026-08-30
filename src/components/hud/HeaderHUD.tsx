@@ -39,6 +39,7 @@ export const HeaderHUD: React.FC = () => {
     activeSoul,
     agentState,
     telemetry,
+    refreshTelemetry,
     settings,
     updateSettings,
   } = useAppStore();
@@ -61,6 +62,13 @@ export const HeaderHUD: React.FC = () => {
     : '192.168.29.205';
   const networkUrl = `http://${hostIp}:5173`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(networkUrl)}&bgcolor=000000&color=ffffff&margin=10`;
+
+  // Auto-refresh real Windows hardware telemetry
+  useEffect(() => {
+    refreshTelemetry();
+    const tInterval = setInterval(refreshTelemetry, 2500);
+    return () => clearInterval(tInterval);
+  }, [refreshTelemetry]);
 
   // Auto-detect local Ollama
   useEffect(() => {
