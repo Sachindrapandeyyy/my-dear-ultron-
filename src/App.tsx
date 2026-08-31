@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { HeaderHUD } from '@/components/hud/HeaderHUD';
 import { VoiceControls } from '@/components/hud/VoiceControls';
@@ -15,11 +15,15 @@ import { YouTubeCyberPlayer } from '@/components/music/YouTubeCyberPlayer';
 import { HandsFreeVoiceController } from '@/components/voice/HandsFreeVoiceController';
 import { SubagentSwarmHub } from '@/components/swarm/SubagentSwarmHub';
 import { audioService } from '@/services/audioService';
+import { systemBootService, BootStatus } from '@/services/systemBootService';
+import { Zap, ShieldCheck } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const { activeTab, setActiveTab, settings, updateSettings, isLocked, setIsLocked, isEnrollModalOpen } = useAppStore();
+  const { activeTab, setActiveTab, settings, updateSettings, isLocked, setIsLocked, isEnrollModalOpen, refreshMemories } = useAppStore();
+  const [bootStatus, setBootStatus] = useState<BootStatus | null>(null);
+  const [showBootToast, setShowBootToast] = useState(false);
 
-  // Load saved settings from local storage on startup
+  // Auto-Boot all core subsystems on application launch
   useEffect(() => {
     try {
       const saved = localStorage.getItem('ultron_settings_v1');
@@ -27,6 +31,15 @@ export const App: React.FC = () => {
         updateSettings(JSON.parse(saved));
       }
     } catch {}
+
+    refreshMemories();
+
+    systemBootService.boot().then((status) => {
+      setBootStatus(status);
+      setShowBootToast(true);
+      if (settings.soundEffects) audioService.playSuccessChime();
+      setTimeout(() => setShowBootToast(false), 4500);
+    });
   }, []);
 
   // Global hotkeys listener
@@ -93,6 +106,19 @@ export const App: React.FC = () => {
 
       {/* Floating Holographic YouTube Music & Video Cyber-Dock */}
       <YouTubeCyberPlayer />
+
+      {/* Holographic System Startup Confirmation Toast */}
+      {showBootToast && bootStatus && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2 rounded-full bg-zinc-950/95 border border-emerald-500/50 shadow-[0_0_25px_rgba(16,185,129,0.35)] backdrop-blur-xl animate-fadeIn text-xs font-mono select-none">
+          <ShieldCheck className="w-4 h-4 text-emerald-400 animate-pulse" />
+          <span className="text-white font-bold tracking-wider">
+            ALL NEURAL SUBSYSTEMS ONLINE
+          </span>
+          <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full font-bold">
+            {bootStatus.activeModel.replace(':latest', '')} // ACTIVE
+          </span>
+        </div>
+      )}
     </div>
   );
 };
