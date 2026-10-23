@@ -17,6 +17,7 @@ import { SubagentSwarmHub } from '@/components/swarm/SubagentSwarmHub';
 import { audioService } from '@/services/audioService';
 import { systemBootService, BootStatus } from '@/services/systemBootService';
 import { Zap, ShieldCheck } from 'lucide-react';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 export const App: React.FC = () => {
   const { activeTab, setActiveTab, settings, updateSettings, isLocked, setIsLocked, isEnrollModalOpen, refreshMemories } = useAppStore();
@@ -81,13 +82,15 @@ export const App: React.FC = () => {
         {/* Tab Content Views */}
         {activeTab !== 'orb' && (
           <div className="absolute inset-0 overflow-y-auto bg-black/90 backdrop-blur-md z-10 animate-fadeIn">
-            {activeTab === 'chat' && <ChatConsole />}
-            {activeTab === 'terminal' && <InteractiveTerminal />}
-            {activeTab === 'swarm' && <SubagentSwarmHub />}
-            {activeTab === 'memory' && <MemoryHub />}
-            {activeTab === 'skills' && <SkillHub />}
-            {activeTab === 'harness' && <HarnessSelector />}
-            {activeTab === 'settings' && <SettingsModal />}
+            <ErrorBoundary fallbackTitle="Workspace Interface Failure">
+              {activeTab === 'chat' && <ChatConsole />}
+              {activeTab === 'terminal' && <InteractiveTerminal />}
+              {activeTab === 'swarm' && <SubagentSwarmHub />}
+              {activeTab === 'memory' && <MemoryHub />}
+              {activeTab === 'skills' && <SkillHub />}
+              {activeTab === 'harness' && <HarnessSelector />}
+              {activeTab === 'settings' && <SettingsModal />}
+            </ErrorBoundary>
           </div>
         )}
       </main>
