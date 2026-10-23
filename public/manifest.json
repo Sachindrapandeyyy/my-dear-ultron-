@@ -1,0 +1,24 @@
+{
+  "name": "ULTRON SOVEREIGN OS",
+  "short_name": "ULTRON",
+  "description": "Autonomous Spatial AI Operating System & Holographic Neural Matrix",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#ff1e42",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "favicon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
